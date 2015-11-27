@@ -11,6 +11,27 @@
   (let [cs (take n (shuffle colors))]
     (zipmap plyr-seq cs)))
 
+
+;; (def illegal-spaces {0  [0 1 2 3 4 5   7 8 9 10 11 12],
+;;                      1  [0 1 2 3 4 5     8 9 10 11 12],
+;;                      2  [0 1 2 3 4       8 9 10 11 12],
+;;                      3  [0 1 2 3 4   X     9 10 11 12],
+;;                      4  [          Y Y               ],
+;;                      5  [0         Z Z Z             ],
+;;                      6  [0                         12],
+;;                      7  [0 1                       12],
+;;                      8  [0 1                    11 12],
+;;                      9  [0 1                       12],
+;;                      10 [0                         12],
+;;                      11 [0                           ],
+;;                      12 [                            ],
+;;                      13 [0 1 2 3 4         9 10 11 12],
+;;                      14 [0 1 2 3 4       8 9 10 11 12],
+;;                      15 [0 1 2 3 4 5     8 9 10 11 12],
+;;                      16 [0 1 2 3 4 5   7 8 9 10 11 12]})
+
+;; 3, 6 -> 5, 7 or 5, 5
+
 (def star
   {0 (range 6 7)
    1 (range 6 8)
@@ -88,19 +109,6 @@
     (seq winners)))
 
 
-(defn- legal-space?
-  "True if this space is a legal board space, false otherwise."
-  [row col]
-  (contains? (set (star row)) col))
-
-(defn single-step
-  "Return all legal spaces reachable via a single step as a vector of row-col pairs."
-  [row col]
-  (let [op (if (even? row) inc dec)
-        rs [row       row       (dec row) (dec row) (inc row) (inc row)]
-        cs [(inc col) (dec col) (op col)  col       (op col)   col]
-        pairs (map vector rs cs)]
-    (filter #(apply legal-space? %) pairs)))
 
 (defn mk-game-board
   "Return a starting game-board for this many players."
@@ -116,13 +124,38 @@
 
 (defn- rotate [n s] 
   (lazy-cat (drop n s) 
-            (take n s))) 
+            (take n s)))
+
 
 (defn whose-turn [game] (first (:turn-seq game)))
 (defn whose-turn-color [game] (get-in game [:colors (whose-turn game)]))
 (defn next-turn [game] (update-in game [:turn-seq] #(rotate 1 %)))
 
+
+
+;;;;;;;;;;;;;;
+;; Movement ;;
+;;;;;;;;;;;;;;
+
+(defn- legal-space?
+  "True if this space is a legal board space, false otherwise."
+  [row col]
+  (contains? (set (star row)) col))
+
+(defn steps-naive
+  "Return all spaces reachable via a single step as a vector of row-col pairs."
+  [row col]
+  (let [ev (even? row)
+        pairs [[row (dec col)]
+               [row (inc col)]
+               [(dec row) (if ev col (dec col))]
+               [(dec row) (if ev (inc col) col)]
+               [(inc row) (if ev col (dec col))]
+               [(inc row) (if ev (inc col) col)]]]
+    pairs))
+
 (defn occupied-space?
+  "Return true if space denoted by row, col is occupied, False otherwise."
   [game row col]
   (let [ms (map val (:players game))
         result (remove false? (for [m ms] (contains? (set (get m row)) col)))]
@@ -145,4 +178,86 @@
               (update-in [:players plyr r2] conj c2)))))
 
 
+(defn single-hops-naive
+  "Return all spaces reachable via a single hop as a vector of row-col pairs.
+  Note: Does not check for adjacent marbles to hope over, just computes hypothetical hop
+  coordinates."
+  [row col]
+  (let [rs [row       row       (- row 2) (- row 2) (+ row 2) (+ row 2)]
+        cs [(- col 2) (+ col 2) (dec col) (inc col) (dec col) (inc col)]
+        pairs (map vector rs cs)]
+    pairs))
+
+;; (single-hops (mk-game-board 2 :two-ten) 2 6)
+
+(defn single-hops
+  "Return all legal and unoccupied spaces reachable via a single hop as a vector of row col pairs."
+  [game row col]
+  (let [ss (steps-naive row col)
+        hs (single-hops-naive row col)
+        pairs (map vector ss hs)]
+    ;; (prn ss)
+    ;; (prn hs)
+    (for [[step hop] pairs
+          :when (and
+                 (apply legal-space? step)
+                 (apply legal-space? hop)
+                 (apply occupied-space? game step)
+                 (not (apply occupied-space? game hop)))]
+      hop)))
+
+(defn steps
+  "Return all legal and unoccupied spaces reachable by a step as a vector of row col pairs."
+  [game row col]
+  (->> (steps-naive row col)
+       (filter #(apply legal-space? %))
+       (remove #(apply occupied-space? game %))))
+
+;; (steps (mk-game-board 2 :two-ten) 13 6)
+
+(defn- hops-helper
+  [game [row col] visited]
+  (let [destinations (set (single-hops game row col))
+        to-visit (set (remove #(contains? (set visited) %) destinations))
+        new-visited (clojure.set/union destinations visited)]
+    (if (empty? to-visit)
+      visited
+      (set (mapcat #(hops-helper (apply move game row col %) % new-visited)
+                   to-visit)))))
+
+(defn hops
+  "Return all legal and unoccupied spaces hoppable-to from this position."
+  [game row col]
+  (let [pairs (hops-helper game [row col] #{[row col]})]
+    (remove #{[row col]} pairs)))
+
+;; (hops (mk-game-board 2 :two-ten) 2 6)
+
+
+(defn- moves-from
+  [game row col]
+  (let [ss (steps game row col)
+        hs (hops game row col)
+        moves (concat ss hs)]
+    (for [pair moves] [[row col] pair])))
+
+;; (moves-from (mk-game-board 2 :two-ten) 2 6)
+
+(defn- ->pair [[k vs]] (for [v vs] [k v]))
+
+(defn marble-locs [game]
+  "Return vector of row,col pairs for the locations of current player's marbles."
+  (let [plyr (whose-turn game)
+        marbles (get-in game [:players plyr])]
+    (mapcat ->pair marbles)))
+
+(defn all-moves
+  "Return seq of all available moves for the current player."
+  [game]
+  (->> game
+       (marble-locs)
+       (map #(apply moves-from game %)) 
+       (apply concat)))
+
+;; (all-moves (mk-game-board 2 :two-ten))
 

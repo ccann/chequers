@@ -5,7 +5,8 @@
                  [org.clojure/clojurescript "1.7.170"]
                  [org.clojure/core.async "0.2.374"]
                  [reagent "0.5.1"]
-                 [com.taoensso/timbre "4.1.4"]]
+                 [com.taoensso/timbre "4.1.4"]
+                 [expectations "2.1.4"]]
 
   :plugins [[lein-cljsbuild "1.1.1"]
             [lein-figwheel "0.5.0-2"]]

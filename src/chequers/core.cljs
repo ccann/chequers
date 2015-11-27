@@ -7,7 +7,8 @@
 
 ;; define your app data so that it doesn't get over-written on reload
 
-(defonce app-state (atom {:text "this?!"}))
+;; was a defonce
+(def app-state (atom {:text "huh???!"}))
 
 (defn hello-world []
   [:h1 (:text @app-state)])
