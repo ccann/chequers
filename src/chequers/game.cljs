@@ -30,8 +30,6 @@
 ;;                      15 [0 1 2 3 4 5     8 9 10 11 12],
 ;;                      16 [0 1 2 3 4 5   7 8 9 10 11 12]})
 
-;; 3, 6 -> 5, 7 or 5, 5
-
 (def star
   {0 (range 6 7)
    1 (range 6 8)
@@ -259,5 +257,10 @@
        (map #(apply moves-from game %)) 
        (apply concat)))
 
-;; (all-moves (mk-game-board 2 :two-ten))
+;; (let [g (mk-game-board 2 :two-ten)
+;;       g2 (move g 2 7 4 6)]
+;;   (prn (all-moves g))
+;;   (prn (all-moves g2)))
+
+;; (all-moves 
 
