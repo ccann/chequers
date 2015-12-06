@@ -1,5 +1,5 @@
 (ns chequers.core
-  (:require [reagent.core :as reagent :refer [atom]]))
+  (:require [reagent.core :as r]))
 
 (enable-console-print!)
 
@@ -8,13 +8,25 @@
 ;; define your app data so that it doesn't get over-written on reload
 
 ;; was a defonce
-(def app-state (atom {:text "huh???!"}))
+(def app-state (r/atom {:text "huh???!"}))
 
 (defn hello-world []
   [:h1 (:text @app-state)])
 
-(reagent/render-component [hello-world]
-                          (. js/document (getElementById "app")))
+
+
+(defn hole [] [:td])
+(defn row [n] [:tr (repeat n [hole])])
+
+(defn hexagram []
+  [:table (map #(conj %2 %1)
+               [1 2 3 4 13 12 11 10 9 10 11 12 13 4 3 2 1]
+               (repeat 17 [row]))])
+
+
+
+
+(r/render-component [hexagram] (.getElementById js/document "root"))
 
 
 (defn on-js-reload []
