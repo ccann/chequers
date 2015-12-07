@@ -5,30 +5,26 @@ body {
     color: white;
 }
 
-table {
-    table-layout: fixed;
-    border-spacing: 6px; /* space between holes */
-    /* border: 10px solid red; */
-    margin-left: auto;
-    margin-right: auto; 
+.table {
+    /* display: table; */
+    border-spacing: 6px;
 }
 
-td {
+.row {
+    text-align: center;
+}
+
+.cell {
+    display: inline-block;
+    margin-left: 5px;
+    margin-right: 5px;
+
     background-color: white;
     border-radius: 50%;
     min-width: 30px;
     min-height: 30px;
-    width: 30px;
-    height: 30px;
+    width: 35px;
+    height: 35px;
 }
-
-
-tr {
-    /* width: 100%; */
-    margin-left: auto;
-    margin-right: auto; 
-}
-
-
 
 

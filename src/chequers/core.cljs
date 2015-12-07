@@ -14,16 +14,13 @@
   [:h1 (:text @app-state)])
 
 
-
-(defn hole [] [:td])
-(defn row [n] [:tr (repeat n [hole])])
+(defn hole [] [:div.cell])
+(defn row [n] [:div.row (repeat n [hole])])
 
 (defn hexagram []
-  [:table (map #(conj %2 %1)
+  [:div.table (map #(conj %2 %1)
                [1 2 3 4 13 12 11 10 9 10 11 12 13 4 3 2 1]
                (repeat 17 [row]))])
-
-
 
 
 (r/render-component [hexagram] (.getElementById js/document "root"))
