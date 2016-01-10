@@ -1,5 +1,5 @@
 (ns chequers.game
-  (:require [taoensso.timbre :as timbre :refer-macros (trace debug info warn error fatal)]))
+  (:require [taoensso.timbre :refer-macros (log trace debug info warn error fatal)]))
 
 (def player-count 2)
 
@@ -93,20 +93,13 @@
 (defn- opponent [player] (-> player (+ 3) (mod 6)))
 (defn- opp-star-corner [game-type player] (get-in star-corners [game-type (opponent player)]))
 
+(defn- rotate-seq [n s] (lazy-cat (drop n s) (take n s)))
+
 (defn- won
   [game player]
   (let [opp (opp-star-corner (:game-type game) player)
         plr ((:players game) player)]
     (when (= opp plr) player)))
-
-
-(defn winner
-  "Return a seq of the winners of the game."
-  [game]
-  (let [winners (remove nil? (map #(won game %) (:turn-seq game)))]
-    (seq winners)))
-
-
 
 (defn mk-game-board
   "Return a starting game-board for this many players."
@@ -120,15 +113,23 @@
       (assoc $ :game-type game-type)
       (assoc $ :turn-seq plyr-seq))))
 
-(defn- rotate [n s] 
-  (lazy-cat (drop n s) 
-            (take n s)))
+
+(defn winners
+  "Return a seq of the winners of the game."
+  [game]
+  (let [ws (->> game
+                (:turn-seq)
+                (map #(won game %))
+                (remove nil?)
+                (seq))]
+    (when ws (println "winner!" ws))
+    ws))
 
 
 (defn whose-turn [game] (first (:turn-seq game)))
 (defn whose-turn-color [game] (get-in game [:colors (whose-turn game)]))
-(defn next-turn [game] (update-in game [:turn-seq] #(rotate 1 %)))
-
+(defn next-turn [game] (update-in game [:turn-seq] #(rotate-seq 1 %)))
+ 
 
 
 ;;;;;;;;;;;;;;
@@ -160,7 +161,7 @@
     (not (empty? result))))
 
 (defn move
-  "Move current players marble at r1, c1 to r2 c2, return new game."
+  "Move current players marble at r1, c1 to r2 c2 return new game."
   [game r1 c1 r2 c2]
   (cond (not (and (legal-space? r2 c2) (legal-space? r1 c1)))
         (do (error "Illegal move!" r1 c1 "to" r2 c2) game)
@@ -174,6 +175,14 @@
               (update-in [:players plyr r1] #(remove #{c1} %))
               (update-in [:players plyr] #(into {} (filter (comp not empty? val) %))) ;; remove empties
               (update-in [:players plyr r2] conj c2)))))
+
+(defn do-move
+  "Move current player's marble and toggle turn."
+  [game r1 c1 r2 c2]
+  (println "attempt move plyr" (whose-turn game) "from" r1 c1 "to" r2 c2)
+  (-> game
+      (move r1 c1 r2 c2)
+      (next-turn)))
 
 
 (defn single-hops-naive
@@ -233,6 +242,7 @@
 
 
 (defn- moves-from
+  "Return a vector of possible moves from this coordinate by current player."
   [game row col]
   (let [ss (steps game row col)
         hs (hops game row col)
@@ -241,7 +251,7 @@
 
 ;; (moves-from (mk-game-board 2 :two-ten) 2 6)
 
-(defn- ->pair [[k vs]] (for [v vs] [k v]))
+(defn ->pair [[k vs]] (for [v vs] [k v]))
 
 (defn marble-locs [game]
   "Return vector of row,col pairs for the locations of current player's marbles."
@@ -254,13 +264,78 @@
   [game]
   (->> game
        (marble-locs)
-       (map #(apply moves-from game %)) 
+       (map #(apply moves-from game %))
        (apply concat)))
 
-;; (let [g (mk-game-board 2 :two-ten)
-;;       g2 (move g 2 7 4 6)]
-;;   (prn (all-moves g))
-;;   (prn (all-moves g2)))
 
-;; (all-moves 
+;; (all-moves (mk-game-board 2 :two-ten))
 
+
+;;;;;;;;;;;;;;;;
+;; Evaluation ;;
+;;;;;;;;;;;;;;;;
+
+(defn- find-children
+  "Return all descendant-states of this game-state by making all possible moves for this turn."
+  [game]
+  (let [moves (all-moves game)]
+    (map (fn [[[r1 c1] [r2 c2]]] (do-move game r1 c1 r2 c2))
+         moves)))
+
+;; (find-children (mk-game-board 2 :two-ten))
+
+(defn- euclidean-distance
+  [[x1 y1] [x2 y2]]
+  (Math/pow
+   (+ (Math/pow (- x1 x2) 2)
+      (Math/pow (- y1 y2) 2))
+   0.5))
+
+;; (euclidean-distance [1 1] [1 3])
+
+(defn score-by-euclidean-distance
+  "Return score of curr player's marble locations. Find the euclidean distance between each marble
+  and the opposite corner, add them up, and normalize."
+  [game]
+  (let [marbs (marble-locs game)
+        corner (opp-star-corner (:game-type game) (whose-turn game))
+        location (first (for [[k v] (seq corner)
+                              :when (= (count v) 1)]
+                          [k (first v)]))
+        distances (map #(euclidean-distance % location) marbs)]
+    (->> distances 
+         (reduce +)
+         (/ 1)
+         (* 1000))))
+
+;; (time (negamax (mk-game-board 2 :two-ten) 1))
+;; (time (negamax (do-move (mk-game-board 2 :two-ten) 2 5 4 4) 1))
+
+(declare descend-tree)
+
+(defn negamax
+  "Return the negamax of this node for player denoted by color."
+  ([node color] (negamax node color 4 (.-MIN_VALUE js/Number.) (.-MAX_VALUE js/Number.)))
+  ([node color depth alpha beta]
+   (if (or (= depth 0) (winners node))
+     (* color (score-by-euclidean-distance node))
+     (->> node
+          (find-children)
+          (descend-tree depth alpha beta color)
+          (remove nil?)
+          (cons alpha)
+          (apply max)))))
+
+(defn- descend-tree
+  "Return a list containing the negamax of each child-node."
+  [depth alpha beta color children]
+  (loop [cs children
+         alpha alpha
+         vs []]
+    (if-not (seq cs) ;; base case, return values
+      vs 
+      (let [v (- (negamax (first cs) (- color) (dec depth) (- beta) (- alpha)))
+            new-alpha (max alpha v)]
+        (if (< new-alpha beta)
+          (recur (next cs) new-alpha (conj vs v))
+          vs)))))

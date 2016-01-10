@@ -1,5 +1,9 @@
 /* some style */
 
+/* wood1 #f6e4ca */
+/* wood2 #f1d5b9 */
+/* wood3 #7d280b */
+
 body {
     background: black;
     color: white;
@@ -19,7 +23,7 @@ body {
     margin-left: 5px;
     margin-right: 5px;
 
-    background-color: white;
+    background-color: #f1d5b9; /* wood2 */
     border-radius: 50%;
     min-width: 30px;
     min-height: 30px;
