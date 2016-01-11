@@ -1,16 +1,32 @@
 (ns chequers.game
-  (:require [taoensso.timbre :refer-macros (log trace debug info warn error fatal)]))
+  (:require [taoensso.timbre :as timbre :refer-macros
+             (log trace debug info warn error fatal spy)]))
+
+
+;;;;;;;;;;;;;
+;; Players ;;
+;;;;;;;;;;;;;
 
 (def player-count 2)
 
 (def ^:private colors #{:blue :green :black :white :red :yellow})
+(def ^:private players [0 3 1 4 2 5])
 
-(defn- assign-rand-colors
-  "Assign to n players a random color where n <= 6."
-  [colors plyr-seq n]
-  (let [cs (take n (shuffle colors))]
-    (zipmap plyr-seq cs)))
+(defn- player-colors
+  "Return a vec of player (int) and color keyword pairs."
+  [n]
+  (let [cs (take n (shuffle chequers.game/colors))]
+    (zipmap chequers.game/players cs)))
 
+(defn- opponent
+  "Return the int representation of this player's opponent."
+  [player]
+  (-> player (+ 3) (mod 6)))
+
+
+;;;;;;;;;;;
+;; Board ;;
+;;;;;;;;;;;
 
 ;; (def illegal-spaces {0  [0 1 2 3 4 5   7 8 9 10 11 12],
 ;;                      1  [0 1 2 3 4 5     8 9 10 11 12],
@@ -90,59 +106,79 @@
        15 (range 6 8)
        16 (range 6 7)}}})
 
-(defn- opponent [player] (-> player (+ 3) (mod 6)))
-(defn- opp-star-corner [game-type player] (get-in star-corners [game-type (opponent player)]))
+(defn- opp-star-corner
+  "Return a map of the coordinates of the opposite star corner for this player."
+  [game-type player]
+  (get-in star-corners [game-type (opponent player)]))
 
-(defn- rotate-seq [n s] (lazy-cat (drop n s) (take n s)))
+(defn game-board
+  "Return a starting game-board for n players."
+  [n game-type]
+  (let [players (take n chequers.game/players)
+        colors-map (player-colors n)]
+    (as-> players $
+      (reduce #(assoc-in %1 [:players %2]
+                         (get-in star-corners [game-type %2])) {} $)
+      (assoc $ :colors colors-map)
+      (assoc $ :game-type game-type)
+      (assoc $ :turn-seq players))))
+
+;;;;;;;;;;;;;;;;;;;;
+;; Game Inquiries ;;
+;;;;;;;;;;;;;;;;;;;;
 
 (defn- won
+  "Return int of player who has won, or nil if no player has won."
   [game player]
   (let [opp (opp-star-corner (:game-type game) player)
         plr ((:players game) player)]
     (when (= opp plr) player)))
 
-(defn mk-game-board
-  "Return a starting game-board for this many players."
-  [player-count game-type]
-  (let [plyr-seq (take player-count [0 3 1 4 2 5])
-        plyr-colors (assign-rand-colors colors plyr-seq player-count)]
-    (as-> plyr-seq $
-      (take player-count $)
-      (reduce #(assoc-in %1 [:players %2] (get-in star-corners [game-type %2])) {} $)
-      (assoc $ :colors plyr-colors)
-      (assoc $ :game-type game-type)
-      (assoc $ :turn-seq plyr-seq))))
-
-
-(defn winners
-  "Return a seq of the winners of the game."
+(defn winner
+  "Return the winner of the game."
   [game]
   (let [ws (->> game
                 (:turn-seq)
                 (map #(won game %))
                 (remove nil?)
                 (seq))]
-    (when ws (println "winner!" ws))
-    ws))
+    (if ws (first ws) nil)))
+
 
 
 (defn whose-turn [game] (first (:turn-seq game)))
 (defn whose-turn-color [game] (get-in game [:colors (whose-turn game)]))
+(defn- rotate-seq [n s] (lazy-cat (drop n s) (take n s)))
 (defn next-turn [game] (update-in game [:turn-seq] #(rotate-seq 1 %)))
- 
 
+(defn ->pair [[k vs]] (for [v vs] [k v]))
+
+(defn marble-locs [game]
+  "Return vector of row,col pairs for the locations of current player's marbles."
+  (let [player (whose-turn game)
+        marbles (get-in game [:players player])]
+    (mapcat ->pair marbles)))
+
+(defn occupied-space?
+  "Is the space denoted by row, col occupied?"
+  [game row col]
+  (let [ms (map val (:players game))
+        result (remove false? (for [m ms] (contains? (set (get m row)) col)))]
+    (not (empty? result))))
+
+(defn- legal-space?
+  "Is this coordinate a legal board space?"
+  [row col]
+  (contains? (set (star row)) col))
+ 
 
 ;;;;;;;;;;;;;;
 ;; Movement ;;
 ;;;;;;;;;;;;;;
 
-(defn- legal-space?
-  "True if this space is a legal board space, false otherwise."
-  [row col]
-  (contains? (set (star row)) col))
 
-(defn steps-naive
-  "Return all spaces reachable via a single step as a vector of row-col pairs."
+(defn- adjacent-spaces
+  "Return all spaces reachable via a single step as a vec of row-col pairs."
   [row col]
   (let [ev (even? row)
         pairs [[row (dec col)]
@@ -153,15 +189,19 @@
                [(inc row) (if ev (inc col) col)]]]
     pairs))
 
-(defn occupied-space?
-  "Return true if space denoted by row, col is occupied, False otherwise."
+(defn single-step-moves
+  "Return all legal and unoccupied spaces reachable by a step as a vector of row col pairs."
   [game row col]
-  (let [ms (map val (:players game))
-        result (remove false? (for [m ms] (contains? (set (get m row)) col)))]
-    (not (empty? result))))
+  (->> (spy (adjacent-spaces row col))
+       (filter #(apply legal-space? %))
+       (remove #(apply occupied-space? game %))))
+
+(single-step-moves (game-board 2 :two-ten) 4 8)
+
+
 
 (defn move
-  "Move current players marble at r1, c1 to r2 c2 return new game."
+  "Return game with current player's marble at (r1, c1) moved to (r2, c2)."
   [game r1 c1 r2 c2]
   (cond (not (and (legal-space? r2 c2) (legal-space? r1 c1)))
         (do (error "Illegal move!" r1 c1 "to" r2 c2) game)
@@ -179,88 +219,65 @@
 (defn do-move
   "Move current player's marble and toggle turn."
   [game r1 c1 r2 c2]
-  (println "attempt move plyr" (whose-turn game) "from" r1 c1 "to" r2 c2)
-  (-> game
-      (move r1 c1 r2 c2)
-      (next-turn)))
+  (let [[i c] [(whose-turn game) (whose-turn-color game)]]
+    (println "DO MOVE player" i c "from" r1 c1 "to" r2 c2)
+    (-> game
+        (move r1 c1 r2 c2)
+        (next-turn))))
+  
 
-
-(defn single-hops-naive
+(defn- single-hop-spaces
   "Return all spaces reachable via a single hop as a vector of row-col pairs.
-  Note: Does not check for adjacent marbles to hope over, just computes hypothetical hop
-  coordinates."
+  Note: Does not check for adjacent marbles to hope over, just computes coordinates reachable via one hop."
   [row col]
   (let [rs [row       row       (- row 2) (- row 2) (+ row 2) (+ row 2)]
         cs [(- col 2) (+ col 2) (dec col) (inc col) (dec col) (inc col)]
         pairs (map vector rs cs)]
     pairs))
 
-;; (single-hops (mk-game-board 2 :two-ten) 2 6)
+;; (single-hops (game-board 2 :two-ten) 2 6)
 
-(defn single-hops
-  "Return all legal and unoccupied spaces reachable via a single hop as a vector of row col pairs."
+(defn single-hop-moves
+  "Return all moves via a single hop from this space as a vector of row col pairs."
   [game row col]
-  (let [ss (steps-naive row col)
-        hs (single-hops-naive row col)
-        pairs (map vector ss hs)]
-    ;; (prn ss)
-    ;; (prn hs)
-    (for [[step hop] pairs
+  (let [neighbors (adjacent-spaces row col)
+        one-hops (single-hop-spaces row col)
+        pairs (map vector neighbors one-hops)]
+    (for [[neighbor hop] pairs
           :when (and
-                 (apply legal-space? step)
+                 (apply legal-space? neighbor)
                  (apply legal-space? hop)
-                 (apply occupied-space? game step)
+                 (apply occupied-space? game neighbor)
                  (not (apply occupied-space? game hop)))]
       hop)))
 
-(defn steps
-  "Return all legal and unoccupied spaces reachable by a step as a vector of row col pairs."
-  [game row col]
-  (->> (steps-naive row col)
-       (filter #(apply legal-space? %))
-       (remove #(apply occupied-space? game %))))
 
-;; (steps (mk-game-board 2 :two-ten) 13 6)
-
-(defn- hops-helper
+(defn- consecutive-hops
   [game [row col] visited]
-  (let [destinations (set (single-hops game row col))
+  (let [destinations (set (single-hop-moves game row col))
         to-visit (set (remove #(contains? (set visited) %) destinations))
         new-visited (clojure.set/union destinations visited)]
     (if (empty? to-visit)
       visited
-      (set (mapcat #(hops-helper (apply move game row col %) % new-visited)
+      (set (mapcat #(consecutive-hops (apply move game row col %) % new-visited)
                    to-visit)))))
 
-(defn hops
-  "Return all legal and unoccupied spaces hoppable-to from this position."
+(defn hop-moves
+  "Return all spaces reachable via consecutive hops from this position."
   [game row col]
-  (let [pairs (hops-helper game [row col] #{[row col]})]
+  (let [pairs (consecutive-hops game [row col] #{[row col]})]
     (remove #{[row col]} pairs)))
 
-;; (hops (mk-game-board 2 :two-ten) 2 6)
-
-
 (defn- moves-from
-  "Return a vector of possible moves from this coordinate by current player."
+  "Return the vec of moves from this position by curr player."
   [game row col]
-  (let [ss (steps game row col)
-        hs (hops game row col)
-        moves (concat ss hs)]
-    (for [pair moves] [[row col] pair])))
-
-;; (moves-from (mk-game-board 2 :two-ten) 2 6)
-
-(defn ->pair [[k vs]] (for [v vs] [k v]))
-
-(defn marble-locs [game]
-  "Return vector of row,col pairs for the locations of current player's marbles."
-  (let [plyr (whose-turn game)
-        marbles (get-in game [:players plyr])]
-    (mapcat ->pair marbles)))
+  (let [all-moves (concat (single-step-moves game row col)
+                          (hop-moves game row col))]
+    (for [resulting-space all-moves]
+      [[row col] resulting-space])))
 
 (defn all-moves
-  "Return seq of all available moves for the current player."
+  "Return vec of all possible moves for the curr player."
   [game]
   (->> game
        (marble-locs)
@@ -268,21 +285,19 @@
        (apply concat)))
 
 
-;; (all-moves (mk-game-board 2 :two-ten))
-
 
 ;;;;;;;;;;;;;;;;
 ;; Evaluation ;;
 ;;;;;;;;;;;;;;;;
 
 (defn- find-children
-  "Return all descendant-states of this game-state by making all possible moves for this turn."
+  "Return all descendant-states of this game-state by making all possible moves."
   [game]
   (let [moves (all-moves game)]
     (map (fn [[[r1 c1] [r2 c2]]] (do-move game r1 c1 r2 c2))
          moves)))
 
-;; (find-children (mk-game-board 2 :two-ten))
+;; (find-children (game-board 2 :two-ten))
 
 (defn- euclidean-distance
   [[x1 y1] [x2 y2]]
@@ -308,8 +323,8 @@
          (/ 1)
          (* 1000))))
 
-;; (time (negamax (mk-game-board 2 :two-ten) 1))
-;; (time (negamax (do-move (mk-game-board 2 :two-ten) 2 5 4 4) 1))
+;; (time (negamax (game-board 2 :two-ten) 1))
+;; (time (negamax (do-move (game-board 2 :two-ten) 2 5 4 4) 1))
 
 (declare descend-tree)
 

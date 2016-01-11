@@ -1,5 +1,7 @@
 (ns chequers.core
-  (:require [reagent.core :as r]))
+  (:require [reagent.core :as r]
+            [taoensso.timbre :as timbre :refer-macros
+             (log trace debug info warn error fatal spy)]))
 
 (enable-console-print!)
 
