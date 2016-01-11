@@ -160,8 +160,6 @@
   (let [marbles (get-in game [:players player])]
     (mapcat ->pair marbles)))
 
-(marble-locs 0 (game-board 2 :two-ten))
-
 (defn occupied-space?
   "Is the space denoted by row, col occupied?"
   [game row col]
@@ -173,7 +171,41 @@
   "Is this coordinate a legal board space?"
   [row col]
   (contains? (set (star row)) col))
- 
+
+(defn has-marble?
+  "Does player have a marble at row,col?"
+  [game player row col]
+  (contains? (set (marble-locs player game))
+             [row col]))
+
+(defn marble-color
+  "Return the color of marble at row,col, nil if there isn't one."
+  [game row col]
+  (let [players (:turn-seq game)
+        player (first (for [p players :when (has-marble? game p row col)] p))]
+    (get (:colors game) player)))
+
+(defn space-style
+  "Return the style of this space row,col."
+  [game hex row col styles]
+  (let [player (whose-turn game)
+        curr-player-marble? (has-marble? game player row col)
+        color (marble-color game row col)
+        state (get-in game [:space-states [row col]])
+        selected? (= :selected state)
+        highlighted? (= :highlighted state)
+        background [:style :background-color]
+        border [:style :border-color]]
+    (cond (and curr-player-marble? selected?)
+          (-> styles
+              (assoc-in border (hex :selected))
+              (assoc-in background (hex color)))
+          highlighted?
+          (assoc-in styles background (hex :highlighted))
+          color
+          (assoc-in styles background (hex color))
+          :else
+          styles)))
 
 ;;;;;;;;;;;;;;
 ;; Movement ;;

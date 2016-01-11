@@ -6,31 +6,31 @@
 
 (enable-console-print!)
 
-(println "Edits to this text should show up in your developer console.")
-
-;; define your app data so that it doesn't get over-written on reload
-
 ;; was a defonce
 (def app-state (r/atom (game/game-board 2 :two-ten)))
 
-(defn hello-world []
-  [:h1 (:text @app-state)])
-
+(defn color->hex
+  [kw]
+  (kw {:blue (name :blue)
+       :green (name :green)
+       :black (name :black)
+       :white (name :white)
+       :red (name :red)
+       :yellow (name :yellow)
+       :selected "black"
+       :highlighted nil}))
 
 (defn space [r c]
   [:div.cell
-   {:style {:background-color
-            (let [players (:turn-seq @app-state)
-                  cs (for [p players
-                           :when (contains?
-                                  (set (game/marble-locs p @app-state))
-                                  [r c])]
-                       p)]
-              (println (:colors @app-state))
-              (cond (= (count cs) 1)
-                    (name (get (:colors @app-state) (first cs)))
-                    :else nil))}}])
+   (let [m {:style nil
+            :on-click
+            #(reset! app-state (assoc-in @app-state [:space-states [r c]] :selected))}
+         m (game/space-style @app-state color->hex r c m)]
+     (info m)
+     m)])
 
+
+     
 (defn row [r]
   [:div.row
    (let [col-range (get game/star r)
