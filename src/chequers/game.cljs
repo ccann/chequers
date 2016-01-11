@@ -9,8 +9,8 @@
 
 (def player-count 2)
 
-(def ^:private colors #{:blue :green :black :white :red :yellow})
-(def ^:private players [0 3 1 4 2 5])
+(def colors #{:blue :green :black :white :red :yellow})
+(def players [0 3 1 4 2 5])
 
 (defn- player-colors
   "Return a vec of player (int) and color keyword pairs."
@@ -115,13 +115,15 @@
   "Return a starting game-board for n players."
   [n game-type]
   (let [players (take n chequers.game/players)
-        colors-map (player-colors n)]
-    (as-> players $
-      (reduce #(assoc-in %1 [:players %2]
-                         (get-in star-corners [game-type %2])) {} $)
-      (assoc $ :colors colors-map)
-      (assoc $ :game-type game-type)
-      (assoc $ :turn-seq players))))
+        colors-map (player-colors n)
+        g (as-> players $
+            (reduce #(assoc-in %1 [:players %2]
+                               (get-in star-corners [game-type %2])) {} $)
+            (assoc $ :colors colors-map)
+            (assoc $ :game-type game-type)
+            (assoc $ :turn-seq players))]
+    (info g)
+    g))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Game Inquiries ;;
@@ -153,11 +155,12 @@
 
 (defn ->pair [[k vs]] (for [v vs] [k v]))
 
-(defn marble-locs [game]
+(defn marble-locs [player game]
   "Return vector of row,col pairs for the locations of current player's marbles."
-  (let [player (whose-turn game)
-        marbles (get-in game [:players player])]
+  (let [marbles (get-in game [:players player])]
     (mapcat ->pair marbles)))
+
+(marble-locs 0 (game-board 2 :two-ten))
 
 (defn occupied-space?
   "Is the space denoted by row, col occupied?"
@@ -195,9 +198,6 @@
   (->> (spy (adjacent-spaces row col))
        (filter #(apply legal-space? %))
        (remove #(apply occupied-space? game %))))
-
-(single-step-moves (game-board 2 :two-ten) 4 8)
-
 
 
 (defn move
@@ -280,7 +280,7 @@
   "Return vec of all possible moves for the curr player."
   [game]
   (->> game
-       (marble-locs)
+       (marble-locs (whose-turn game))
        (map #(apply moves-from game %))
        (apply concat)))
 
@@ -312,7 +312,7 @@
   "Return score of curr player's marble locations. Find the euclidean distance between each marble
   and the opposite corner, add them up, and normalize."
   [game]
-  (let [marbs (marble-locs game)
+  (let [marbs (marble-locs (whose-turn game) game)
         corner (opp-star-corner (:game-type game) (whose-turn game))
         location (first (for [[k v] (seq corner)
                               :when (= (count v) 1)]
@@ -332,7 +332,7 @@
   "Return the negamax of this node for player denoted by color."
   ([node color] (negamax node color 4 (.-MIN_VALUE js/Number.) (.-MAX_VALUE js/Number.)))
   ([node color depth alpha beta]
-   (if (or (= depth 0) (winners node))
+   (if (or (= depth 0) (winner node))
      (* color (score-by-euclidean-distance node))
      (->> node
           (find-children)

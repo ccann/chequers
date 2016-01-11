@@ -1,5 +1,6 @@
 (ns chequers.core
   (:require [reagent.core :as r]
+            [chequers.game :as game]
             [taoensso.timbre :as timbre :refer-macros
              (log trace debug info warn error fatal spy)]))
 
@@ -10,18 +11,37 @@
 ;; define your app data so that it doesn't get over-written on reload
 
 ;; was a defonce
-(def app-state (r/atom {:text "huh???!"}))
+(def app-state (r/atom (game/game-board 2 :two-ten)))
 
 (defn hello-world []
   [:h1 (:text @app-state)])
 
 
-(defn hole [] [:div.cell])
-(defn row [n] [:div.row (repeat n [hole])])
+(defn space [r c]
+  [:div.cell
+   {:style {:background-color
+            (let [players (:turn-seq @app-state)
+                  cs (for [p players
+                           :when (contains?
+                                  (set (game/marble-locs p @app-state))
+                                  [r c])]
+                       p)]
+              (println (:colors @app-state))
+              (cond (= (count cs) 1)
+                    (name (get (:colors @app-state) (first cs)))
+                    :else nil))}}])
+
+(defn row [r]
+  [:div.row
+   (let [col-range (get game/star r)
+         num-cols (count col-range)]
+     (map #(conj %2 %1)
+          col-range
+          (repeat num-cols [space r])))])
 
 (defn hexagram []
   [:div.table (map #(conj %2 %1)
-               [1 2 3 4 13 12 11 10 9 10 11 12 13 4 3 2 1]
+               (range 17)
                (repeat 17 [row]))])
 
 
