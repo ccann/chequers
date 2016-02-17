@@ -1,1 +1,3 @@
-Chequers!
+# Chinese Chequers in ClojureScript
+
+WIP
