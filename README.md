@@ -1,3 +1,3 @@
-# Chinese Chequers in ClojureScript
+# chequers
 
-WIP
+Chinese Chequers in Clojurescript: a work in progress
