@@ -1,6 +1,7 @@
 (ns chequers.core
   (:require [reagent.core :as r]
-            [chequers.game :as game]))
+            [chequers.game :as g]
+            [taoensso.timbre :refer-macros (log  trace  debug  info  warn  error  fatal)]))
 
 (enable-console-print!)
 
@@ -8,7 +9,7 @@
 
 ;; define your app data so that it doesn't get over-written on reload
 
-(defonce app (r/atom (game/game-board 2 :two-ten)))
+(defonce app (r/atom (g/game-board 2 :two-ten)))
 
 (defn color->hex
   [kw]
@@ -18,23 +19,30 @@
        :white (name :white)
        :red (name :red)
        :yellow (name :yellow)
-       :selected "black"
+       :selected "white"
        :highlighted nil}))
 
-(defn space [r c]
-  [:div.cell
-   (let [m {:style nil
-            :on-click
-            #(reset! app-state (assoc-in @app-state [:space-states [r c]] :selected))}
-         m (game/space-style @app-state color->hex r c m)]
-     (info m)
-     m)])
+(defn mark-as-selected!
+  "Mark the marble at (row, col) as selected if no marbles are currently marked."
+  [row col]
+  (debug (vals  (:space-states @app)))
+  (debug (some #(= % :selected) (-> @app :space-states vals)))
+  (swap! app assoc-in [:space-states [row col]]
+         (if (some #(= % :selected) (-> @app :space-states vals))
+           nil
+           :selected)))
 
+
+(defn space [r c]
+  (let [m (-> {:style {:box-shadow "inset 0px 0px 0px 0px"}
+               :on-click #(mark-as-selected! r c)}
+              (g/assoc-style @app r c color->hex))]
+    [:div.cell m]))
 
      
 (defn row [r]
   [:div.row
-   (let [col-range (get game/star r)
+   (let [col-range (get g/star r)
          num-cols (count col-range)]
      (map #(conj %2 %1)
           col-range

@@ -1,2 +1,35 @@
 /* some style */
 
+/* wood1 #f6e4ca */
+/* wood2 #f1d5b9 */
+/* wood3 #7d280b */
+
+body {
+    background: gray;
+    color: white;
+}
+
+.table {
+    /* display: table; */
+    border-spacing: 6px;
+}
+
+.row {
+    text-align: center;
+}
+
+.cell {
+    display: inline-block;
+    margin-left: 5px;
+    margin-right: 5px;
+
+    background-color: #f1d5b9; /* wood2 */
+    box-shadow:inset 0px 0px 0px 0px;
+    border-radius: 50%;
+    min-width: 30px;
+    min-height: 30px;
+    width: 35px;
+    height: 35px;
+}
+
+

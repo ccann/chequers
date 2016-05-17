@@ -1,6 +1,5 @@
 (ns chequers.game
-  (:require [taoensso.timbre :as timbre :refer-macros
-             (log trace debug info warn error fatal spy)]))
+  (:require [taoensso.timbre :refer-macros (log trace debug info warn error fatal spy)]))
 
 
 ;;;;;;;;;;;;;
@@ -185,27 +184,33 @@
         player (first (for [p players :when (has-marble? game p row col)] p))]
     (get (:colors game) player)))
 
-(defn space-style
-  "Return the style of this space row,col."
-  [game hex row col styles]
-  (let [player (whose-turn game)
-        curr-player-marble? (has-marble? game player row col)
+
+(defn assoc-style
+  "Compute the style for this space and return the space with style assoced."
+  [space game row col ->hex]
+  (let [curr-player (whose-turn game)
+        my-marble? (has-marble? game curr-player row col)
         color (marble-color game row col)
         state (get-in game [:space-states [row col]])
-        selected? (= :selected state)
-        highlighted? (= :highlighted state)
-        background [:style :background-color]
-        border [:style :border-color]]
-    (cond (and curr-player-marble? selected?)
-          (-> styles
-              (assoc-in border (hex :selected))
-              (assoc-in background (hex color)))
-          highlighted?
-          (assoc-in styles background (hex :highlighted))
-          color
-          (assoc-in styles background (hex color))
-          :else
-          styles)))
+        background-color [:style :background-color]
+        box-shadow [:style :box-shadow]
+        border-color [:style :border-color]]
+    (debug "state:" state)
+    (cond
+      ;; this marb is owned by current player and is selected
+      (and my-marble? (= :selected state))
+      (-> space
+          (assoc-in border-color (->hex :selected))
+          (assoc-in box-shadow "inset 0px 0px 0px 3px")
+          (assoc-in background-color (->hex color)))
+      ;; this marb is highlighted 
+      (= :highlighted state)
+      (assoc-in space background-color (->hex :highlighted))
+      ;; this marb has an assigned color (it is in the game)
+      color
+      (assoc-in space background-color (->hex color))
+      ;; add no style
+      :else space)))
 
 ;;;;;;;;;;;;;;
 ;; Movement ;;
