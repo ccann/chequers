@@ -15,15 +15,13 @@
 (defn color->hex
   "Return the hex value of the color denoted by the keyword."
   [kw]
-  (let [bounds {:red ["red" "yellow" "white"]
-                ;; :green ["#002616" "#539C7D" "#95CBB4"]
-                :green ["#95CBB4" "#539C7D" "#002616"]
-                :white ["white" "white" "white"]
-                :black ["black" "black" "black"]
-                :yellow ["yellow" "yellow" "yellow"]
-                :blue ["blue" "blue" "blue"] 
-                :possible-move ["#FD5F00" "#FD5F00" "#FD5F00"]
-                :selected ["white" "white" "white"]}]
+  (let [bounds {:green ["#95CBB4" "#539C7D" "#002616"]
+                :yellow ["#FFF9BA" "#F0E14B" "#575011"]
+                :red ["#FFA990" "#DD7354" "#6E1B03"]
+                :black ["#717171" "#242424" "#444444"]
+                :blue ["#9FAABE" "#4D6BA7" "#122D63"]
+                :white ["#FFFFFF" "#E2E2E2" "#A3A39F"]
+                :possible-move ["#FD5F00" "#FD5F00" "#FD5F00"]}]
     (kw bounds)))
 
 (defn assoc-background
