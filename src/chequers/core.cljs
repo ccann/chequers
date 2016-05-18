@@ -5,13 +5,13 @@
 
 (enable-console-print!)
 
-(println "This text is printed from src/chequers/core.cljs. Go ahead and edit it and see reloading in action.")
-
-;; define your app data so that it doesn't get over-written on reload
-
-(defonce app (r/atom (g/game-board 2 :two-ten)))
+(defonce app
+  (->>
+   (g/game-board 2 :two-ten)
+   (r/atom)))
 
 (defn color->hex
+  "Return the hex value of the color denoted by the keyword."
   [kw]
   (kw {:blue (name :blue)
        :green (name :green)
@@ -19,41 +19,34 @@
        :white (name :white)
        :red (name :red)
        :yellow (name :yellow)
-       :selected "white"
-       :highlighted nil}))
+       :possible-move "#FD5F00"
+       :selected "white"}))
 
-(defn mark-as-selected!
+(defn mark-selected!
   "Mark the marble at (row, col) as selected if no marbles are currently marked."
   [row col]
-  (debug (vals  (:space-states @app)))
-  (debug (some #(= % :selected) (-> @app :space-states vals)))
-  (swap! app assoc-in [:space-states [row col]]
-         (if (some #(= % :selected) (-> @app :space-states vals))
-           nil
-           :selected)))
-
+  (let [curr-player (g/whose-turn @app)]
+    (when (g/has-marble? @app curr-player row col)
+      (swap! app assoc
+             :selected [row col]
+             :possible-moves (set (g/moves-from @app row col))))))
 
 (defn space [r c]
-  (let [m (-> {:style {:box-shadow "inset 0px 0px 0px 0px"}
-               :on-click #(mark-as-selected! r c)}
-              (g/assoc-style @app r c color->hex))]
-    [:div.cell m]))
-
-     
-(defn row [r]
-  [:div.row
-   (let [col-range (get g/star r)
-         num-cols (count col-range)]
-     (map #(conj %2 %1)
-          col-range
-          (repeat num-cols [space r])))])
+  ^{:key [r c]}
+  [:div.cell  (-> {:style {:box-shadow "inset 0px 0px 0px 0px"}
+                   :on-click #(mark-selected! r c)}
+                  (g/assoc-style @app r c color->hex))])
 
 (defn hexagram []
-  [:div.table (map #(conj %2 %1)
-               (range 17)
-               (repeat 17 [row]))])
+  [:div.table
+   [:div
+    (doall (for [r (range 17)]
+             ^{:key r}
+             [:div.row
+              (doall (for [c (get g/star r)]
+                       (space r c)))]))]])
 
-
+   
 (r/render-component [hexagram] (. js/document (getElementById "app")))
 
 

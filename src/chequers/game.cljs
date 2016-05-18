@@ -118,9 +118,12 @@
         g (as-> players $
             (reduce #(assoc-in %1 [:players %2]
                                (get-in star-corners [game-type %2])) {} $)
-            (assoc $ :colors colors-map)
-            (assoc $ :game-type game-type)
-            (assoc $ :turn-seq players))]
+            (assoc $
+                   :colors colors-map
+                   :game-type game-type
+                   :turn-seq players
+                   :selected nil
+                   :possible-moves #{}))]
     (info g)
     g))
 
@@ -188,24 +191,24 @@
 (defn assoc-style
   "Compute the style for this space and return the space with style assoced."
   [space game row col ->hex]
-  (let [curr-player (whose-turn game)
-        my-marble? (has-marble? game curr-player row col)
-        color (marble-color game row col)
-        state (get-in game [:space-states [row col]])
+  (let [color (marble-color game row col)
+        selected? (= [row col] (:selected game))
+        possible-moves (->> game (:possible-moves) (map second) (set))
+        possible-move? (contains? possible-moves [row col])
         background-color [:style :background-color]
         box-shadow [:style :box-shadow]
         border-color [:style :border-color]]
-    (debug "state:" state)
+    ;; (debug row col)
+    ;; (debug (map second (:possible-moves game)))
     (cond
-      ;; this marb is owned by current player and is selected
-      (and my-marble? (= :selected state))
+      selected?
       (-> space
           (assoc-in border-color (->hex :selected))
           (assoc-in box-shadow "inset 0px 0px 0px 3px")
           (assoc-in background-color (->hex color)))
-      ;; this marb is highlighted 
-      (= :highlighted state)
-      (assoc-in space background-color (->hex :highlighted))
+      ;; this marb is a possible move
+      possible-move?
+      (assoc-in space background-color (->hex :possible-move))
       ;; this marb has an assigned color (it is in the game)
       color
       (assoc-in space background-color (->hex color))
@@ -232,7 +235,7 @@
 (defn single-step-moves
   "Return all legal and unoccupied spaces reachable by a step as a vector of row col pairs."
   [game row col]
-  (->> (spy (adjacent-spaces row col))
+  (->> (adjacent-spaces row col)
        (filter #(apply legal-space? %))
        (remove #(apply occupied-space? game %))))
 
@@ -305,7 +308,7 @@
   (let [pairs (consecutive-hops game [row col] #{[row col]})]
     (remove #{[row col]} pairs)))
 
-(defn- moves-from
+(defn moves-from
   "Return the vec of moves from this position by curr player."
   [game row col]
   (let [all-moves (concat (single-step-moves game row col)
