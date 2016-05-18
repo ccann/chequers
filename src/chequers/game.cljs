@@ -188,30 +188,6 @@
     (get (:colors game) player)))
 
 
-(defn assoc-style
-  "Compute the style for this space and return the space with style assoced."
-  [space game row col ->hex]
-  (let [color (marble-color game row col)
-        selected? (= [row col] (:selected game))
-        possible-move? (contains? (:possible-moves game) [row col])
-        background-color [:style :background-color]
-        border-color [:style :border-color]]
-    ;; (debug row col)
-    ;; (debug (map second (:possible-moves game)))
-    (cond
-      selected?
-      (-> space
-          (assoc :class "space selected")
-          (assoc-in border-color (->hex :selected))
-          (assoc-in background-color (->hex color)))
-      ;; this marb is a possible move
-      possible-move?
-      (assoc-in space background-color (->hex :possible-move))
-      ;; this marb has an assigned color (it is in the game)
-      color
-      (assoc-in space background-color (->hex color))
-      ;; add no style
-      :else space)))
 
 ;;;;;;;;;;;;;;
 ;; Movement ;;
@@ -258,7 +234,7 @@
   "Move current player's marble and toggle turn."
   [game r1 c1 r2 c2]
   (let [[i c] [(whose-turn game) (whose-turn-color game)]]
-    (println "DO MOVE player" i c "from" r1 c1 "to" r2 c2)
+    ;; (debug "DO MOVE player" i c "from" r1 c1 "to" r2 c2)
     (-> game
         (move r1 c1 r2 c2)
         (next-turn))))
@@ -361,7 +337,7 @@
          (/ 1)
          (* 1000))))
 
-;; (time (negamax (game-board 2 :two-ten) 1))
+;; (time (negamax (game-board 2 :two-ten) 1 5))
 ;; (time (negamax (do-move (game-board 2 :two-ten) 2 5 4 4) 1))
 
 (declare descend-tree)
@@ -369,7 +345,11 @@
 (defn negamax
   "Return the negamax of this node for player denoted by color."
   ([node color] (negamax node color 4 (.-MIN_VALUE js/Number.) (.-MAX_VALUE js/Number.)))
+  ([node color depth] (negamax node color depth (.-MIN_VALUE js/Number.) (.-MAX_VALUE js/Number.)))
   ([node color depth alpha beta]
+   ;; (println "node:" node)
+   ;; (println "depth:" depth)
+   ;; (println "alpha:" alpha "beta:" beta)
    (if (or (= depth 0) (winner node))
      (* color (score-by-euclidean-distance node))
      (->> node
@@ -392,3 +372,19 @@
         (if (< new-alpha beta)
           (recur (next cs) new-alpha (conj vs v))
           vs)))))
+
+(defn comp-do-move
+  [game depth]
+  (let [moves (all-moves game)
+        _ (debug moves)
+        possible-states (->> moves
+                             (map flatten)
+                             (map #(apply do-move game %)))
+        scores (map #(negamax % 1 depth) possible-states)
+        _ (debug (sort > scores))
+        [score [[r1 c1] [r2 c2]]] (->> moves
+                                       (map vector scores)
+                                       (sort-by first >)
+                                       (first))]
+    (debug "COMP DO MOVE from" r1 c1 "to" r2 c2 "with score" score)
+    (do-move game r1 c1 r2 c2)))

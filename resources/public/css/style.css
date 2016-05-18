@@ -22,6 +22,12 @@ body {
     display: inline-block;
     margin-left: 5px;
     margin-right: 5px;
+    
+    /* for debug labels */
+    font-size: 0.5em;
+    text-align: center;
+    line-height: 35px;
+    color: black;
 
     background-color: #f1d5b9; /* wood2 */
     box-shadow:inset 0px 0px 0px 0px;
@@ -35,6 +41,27 @@ body {
 
 .selected {
     box-shadow: inset 0px 0px 0px 3px;
-    background-color:
+    /* animation: blinker 1s linear infinite; */
 }
 
+@keyframes blinker {  
+    50% { opacity: 0.3; }
+}
+
+.possible {
+    animation: blinker 1s linear infinite;
+}
+
+.console {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    color: white;
+}
+
+input {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    display:block;
+}
