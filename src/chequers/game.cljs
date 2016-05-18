@@ -193,18 +193,16 @@
   [space game row col ->hex]
   (let [color (marble-color game row col)
         selected? (= [row col] (:selected game))
-        possible-moves (->> game (:possible-moves) (map second) (set))
-        possible-move? (contains? possible-moves [row col])
+        possible-move? (contains? (:possible-moves game) [row col])
         background-color [:style :background-color]
-        box-shadow [:style :box-shadow]
         border-color [:style :border-color]]
     ;; (debug row col)
     ;; (debug (map second (:possible-moves game)))
     (cond
       selected?
       (-> space
+          (assoc :class "space selected")
           (assoc-in border-color (->hex :selected))
-          (assoc-in box-shadow "inset 0px 0px 0px 3px")
           (assoc-in background-color (->hex color)))
       ;; this marb is a possible move
       possible-move?

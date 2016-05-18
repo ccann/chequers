@@ -18,7 +18,7 @@ body {
     text-align: center;
 }
 
-.cell {
+.space {
     display: inline-block;
     margin-left: 5px;
     margin-right: 5px;
@@ -32,4 +32,9 @@ body {
     height: 35px;
 }
 
+
+.selected {
+    box-shadow: inset 0px 0px 0px 3px;
+    background-color:
+}
 

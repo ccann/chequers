@@ -29,13 +29,26 @@
     (when (g/has-marble? @app curr-player row col)
       (swap! app assoc
              :selected [row col]
-             :possible-moves (set (g/moves-from @app row col))))))
+             :possible-moves (as-> @app $
+                                 (g/moves-from $ row col)
+                                 (map second $)
+                                 (set $))))))
+
+(defn maybe-move!
+  [r2 c2]
+  (when (contains? (:possible-moves @app) [r2 c2])
+    (let [[r1 c1] (:selected @app)]
+      (swap! app merge (g/do-move @app r1 c1 r2 c2))
+      (swap! app assoc
+             :selected nil
+             :possible-moves #{}))))
 
 (defn space [r c]
   ^{:key [r c]}
-  [:div.cell  (-> {:style {:box-shadow "inset 0px 0px 0px 0px"}
-                   :on-click #(mark-selected! r c)}
-                  (g/assoc-style @app r c color->hex))])
+  [:div (-> {:class "space"
+             :on-click #(do (mark-selected! r c)
+                            (maybe-move! r c))}
+            (g/assoc-style @app r c color->hex))])
 
 (defn hexagram []
   [:div.table
@@ -46,7 +59,6 @@
               (doall (for [c (get g/star r)]
                        (space r c)))]))]])
 
-   
 (r/render-component [hexagram] (. js/document (getElementById "app")))
 
 
