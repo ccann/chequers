@@ -5,7 +5,7 @@
 
 (enable-console-print!)
 
-(def debug-mode true)
+(def debug-mode false)
 
 (defonce app
   (->>
@@ -15,39 +15,67 @@
 (defn color->hex
   "Return the hex value of the color denoted by the keyword."
   [kw]
-  (kw {:blue (name :blue)
-       :green (name :green)
-       :black (name :black)
-       :white (name :white)
-       :red (name :red)
-       :yellow (name :yellow)
-       :possible-move "#FD5F00"
-       :selected "white"}))
+  (let [bounds {:red ["red" "yellow" "white"]
+                ;; :green ["#002616" "#539C7D" "#95CBB4"]
+                :green ["#95CBB4" "#539C7D" "#002616"]
+                :white ["white" "white" "white"]
+                :black ["black" "black" "black"]
+                :yellow ["yellow" "yellow" "yellow"]
+                :blue ["blue" "blue" "blue"] 
+                :possible-move ["#FD5F00" "#FD5F00" "#FD5F00"]
+                :selected ["white" "white" "white"]}]
+    (kw bounds)))
+
+(defn assoc-background
+  [space color]
+  (let [[a b c] (color->hex color)]
+    (-> space
+        (assoc :style {:background (str "-webkit-radial-gradient(circle, " a ", " b ", " c ")")})
+         
+
+;; (str
+;;                       ;; b ", "
+;;                           "-webkit-radial-gradient(circle, " a ", " b ", " c ")"
+;;                           ;; "-o-radial-gradient(circle, " a ", " b ", " c "), "
+;;                           ;; "-moz-radial-gradient(circle, " a ", " b ", " c "), "
+;;                           ;; "radial-gradient(circle, " a ", " b ", " c ")"
+;; )
+)))
+
 
 (defn assoc-style
   "Compute the style for this space and return the space with style assoced."
   [space game row col]
   (let [color (g/marble-color game row col)
         selected? (= [row col] (:selected game))
-        possible-move? (contains? (:possible-moves game) [row col])
-        background-color [:style :background-color]
-        border-color [:style :border-color]]
+        possible-move? (contains? (:possible-moves game) [row col])]
     ;; (debug row col)
     ;; (debug (map second (:possible-moves game)))
     (cond
+      ;; currently selected
       selected?
       (-> space
-          (assoc :class "space selected")
-          (assoc-in border-color (color->hex :selected))
-          (assoc-in background-color (color->hex color)))
-      ;; this marb is a possible move
+          (assoc :class "space selected glow")
+          (assoc-background color))
+      
+      ;; a possible move
       possible-move?
       (-> space
-          (assoc-in background-color (color->hex :possible-move))
+          (assoc-background :possible-move)
           (assoc :class "space possible"))
-      ;; this marb has an assigned color (it is in the game)
+
+      ;; owned by current player
+      (g/has-marble? @app (g/whose-turn @app) row col)
+      (-> space
+          (assoc-background color)
+          (assoc :class "space owned hvr-glow"))
+
+      ;; has an assigned color (it is in the game)
       color
-      (assoc-in space background-color (color->hex color))
+      (-> space
+          (assoc-background color)
+          (assoc :class "space"))
+      
       ;; add no style
       :else space)))
 
