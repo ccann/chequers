@@ -9,7 +9,8 @@
                  [org.clojure/core.async "0.2.374"
                   :exclusions [org.clojure/tools.reader]]
                  [com.taoensso/timbre "4.3.1"]
-                 [reagent "0.5.1"]]
+                 [reagent "0.5.1"]
+                 [garden "1.3.2"]]
   
   :plugins [[lein-figwheel "0.5.3-1"]
             [lein-cljsbuild "1.1.3" :exclusions [[org.clojure/clojure]]]]

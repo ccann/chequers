@@ -1,7 +1,8 @@
 (ns chequers.core
   (:require [reagent.core :as r]
             [chequers.game :as g]
-            [taoensso.timbre :refer-macros (log  trace  debug  info  warn  error  fatal)]))
+            [taoensso.timbre :refer-macros (log  trace  debug  info  warn  error  fatal)]
+            [garden.core :refer [css]]))
 
 (enable-console-print!)
 
@@ -12,67 +13,60 @@
    (g/game-board 2 :two-ten)
    (r/atom)))
 
-(defn color->hex
+(defn ->hex
   "Return the hex value of the color denoted by the keyword."
   [kw]
-  (let [bounds {:green ["#95CBB4" "#539C7D" "#002616"]
-                :yellow ["#FFF9BA" "#F0E14B" "#575011"]
-                :red ["#FFA990" "#DD7354" "#6E1B03"]
-                :black ["#717171" "#242424" "#444444"]
-                :blue ["#9FAABE" "#4D6BA7" "#122D63"]
-                :white ["#FFFFFF" "#E2E2E2" "#A3A39F"]
-                :possible-move ["#FD5F00" "#FD5F00" "#FD5F00"]}]
-    (kw bounds)))
+  (kw {:green ["#95CBB4" "#539C7D" "#002616"]
+       :yellow ["#FFF9BA" "#F0E14B" "#575011"]
+       :red ["#FFA990" "#DD7354" "#6E1B03"]
+       :black ["#717171" "#242424" "#444444"]
+       :purple ["#D8B6DF" "#AA76B5" "#571B64"]
+       :blue ["#9FAABE" "#4D6BA7" "#122D63"]
+       :white ["#FFFFFF" "#E2E2E2" "#A3A39F"]
+       :possible-move ["#FD5F00" "#FD5F00" "#FD5F00"]}))
 
-(defn assoc-background
-  [space color]
-  (let [[a b c] (color->hex color)]
-    (-> space
-        (assoc :style {:background (str "-webkit-radial-gradient(circle, " a ", " b ", " c ")")})
-         
+(defn- background-css
+  [color]
+  (let [[a b c] (->hex color)]
+    [{:background b}
+     {:background (str "-webkit-radial-gradient(circle, " a ", " b ", " c ")")}
+     {:background (str "-o-radial-gradient(circle, " a ", " b ", " c ")")}
+     {:background (str "-moz-radial-gradient(circle, " a ", " b ", " c ")")}
+     {:background (str "radial-gradient(circle, " a ", " b ", " c ")")}]))
 
-;; (str
-;;                       ;; b ", "
-;;                           "-webkit-radial-gradient(circle, " a ", " b ", " c ")"
-;;                           ;; "-o-radial-gradient(circle, " a ", " b ", " c "), "
-;;                           ;; "-moz-radial-gradient(circle, " a ", " b ", " c "), "
-;;                           ;; "radial-gradient(circle, " a ", " b ", " c ")"
-;; )
-)))
-
+(def backgrounds
+  (css (vec (flatten [:.green (background-css :green)]))
+       (vec (flatten [:.red (background-css :red)]))
+       (vec (flatten [:.yellow (background-css :yellow)]))
+       (vec (flatten [:.black (background-css :black)]))
+       (vec (flatten [:.purple (background-css :purple)]))
+       (vec (flatten [:.blue (background-css :blue)]))
+       (vec (flatten [:.white (background-css :white)]))
+       (vec (flatten [:.possible-move (background-css :possible-move)]))))
 
 (defn assoc-style
   "Compute the style for this space and return the space with style assoced."
   [space game row col]
   (let [color (g/marble-color game row col)
+        color (when color (name color))
         selected? (= [row col] (:selected game))
         possible-move? (contains? (:possible-moves game) [row col])]
-    ;; (debug row col)
-    ;; (debug (map second (:possible-moves game)))
     (cond
       ;; currently selected
       selected?
-      (-> space
-          (assoc :class "space selected glow")
-          (assoc-background color))
+      (assoc space :class (str "space selected glow " color))
       
       ;; a possible move
       possible-move?
-      (-> space
-          (assoc-background :possible-move)
-          (assoc :class "space possible"))
-
+      (assoc space :class (str "space possible possible-move"))
+      
       ;; owned by current player
       (g/has-marble? @app (g/whose-turn @app) row col)
-      (-> space
-          (assoc-background color)
-          (assoc :class "space owned hvr-glow"))
-
+      (assoc space :class (str "space owned hvr-glow " color))
+      
       ;; has an assigned color (it is in the game)
       color
-      (-> space
-          (assoc-background color)
-          (assoc :class "space"))
+      (assoc space :class (str "space " color))
       
       ;; add no style
       :else space)))
@@ -102,7 +96,7 @@
 (defn bot-battle
   []
   (when-not (g/winner @app)
-    (swap! app merge (g/comp-do-move @app 1))))
+    (swap! app merge (g/comp-do-move @app 3))))
 
 ;;;;;;;;;;
 ;; HTML ;;
@@ -113,13 +107,14 @@
 
 (defn space [r c]
   ^{:key [r c]}
-  [:div 
-   (-> {:class "space"
-        :on-click #(do (mark-selected! r c)
-                       (maybe-move! r c))}
-       (assoc-style @app r c))
-   (when debug-mode
-     (str r ", " c))])
+  [:div (assoc-style {:class "space"
+                      :on-click #(do (mark-selected! r c)
+                                     (maybe-move! r c))}
+                     @app r c)
+   [:style backgrounds]
+   [:div
+    (when debug-mode
+      (str r ", " c))]])
 
 
 (defn hexagram []
@@ -143,7 +138,7 @@
    [:input 
     {:type "button"
      :value "COMP DO MOVE"
-     :on-click #(swap! app merge (g/comp-do-move @app 1))}]
+     :on-click #(swap! app merge (g/comp-do-move @app 3))}]
 
    [:input
     {:type "button"
