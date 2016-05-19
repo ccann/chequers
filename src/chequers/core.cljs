@@ -35,29 +35,30 @@
      {:background (str "radial-gradient(circle, " a ", " b ", " c ")")}]))
 
 (def backgrounds
-  (css (vec (flatten [:.green (background-css :green)]))
-       (vec (flatten [:.red (background-css :red)]))
-       (vec (flatten [:.yellow (background-css :yellow)]))
-       (vec (flatten [:.black (background-css :black)]))
-       (vec (flatten [:.purple (background-css :purple)]))
-       (vec (flatten [:.blue (background-css :blue)]))
-       (vec (flatten [:.white (background-css :white)]))
-       (vec (flatten [:.possible-move (background-css :possible-move)]))))
+  (->> [[:.green (background-css :green)]
+        [:.red (background-css :red)]              
+        [:.yellow (background-css :yellow)]
+        [:.black (background-css :black)]
+        [:.purple (background-css :purple)]
+        [:.blue (background-css :blue)]
+        [:.white (background-css :white)]
+        [:.possible-move (background-css :possible-move)]]
+       (map flatten)
+       (map vec)
+       (apply css)))
 
 (defn assoc-style
   "Compute the style for this space and return the space with style assoced."
   [space game row col]
   (let [color (g/marble-color game row col)
-        color (when color (name color))
-        selected? (= [row col] (:selected game))
-        possible-move? (contains? (:possible-moves game) [row col])]
+        color (when color (name color))]
     (cond
       ;; currently selected
-      selected?
+      (= [row col] (:selected game))
       (assoc space :class (str "space selected glow " color))
       
       ;; a possible move
-      possible-move?
+      (contains? (:possible-moves game) [row col])
       (assoc space :class (str "space possible possible-move"))
       
       ;; owned by current player
@@ -107,18 +108,16 @@
 
 (defn space [r c]
   ^{:key [r c]}
-  [:div (assoc-style {:class "space"
-                      :on-click #(do (mark-selected! r c)
-                                     (maybe-move! r c))}
-                     @app r c)
-   [:style backgrounds]
-   [:div
-    (when debug-mode
-      (str r ", " c))]])
-
+  [:div (assoc-style
+         {:class "space"
+          :on-click #(do (mark-selected! r c)
+                         (maybe-move! r c))}
+         @app r c)
+   [:div (when debug-mode (str r ", " c))]])
 
 (defn hexagram []
   [:div
+   [:style backgrounds]
    [:div.table
     [:div
      (doall (for [r (range 17)]
@@ -148,11 +147,7 @@
    [:input
     {:type "button"
      :value "END BLOODSHED"
-     :on-click #(js/clearInterval interval)}]
-
-   
-
-])
+     :on-click #(js/clearInterval interval)}]])
 
 (r/render-component [hexagram] (. js/document (getElementById "app")))
 
