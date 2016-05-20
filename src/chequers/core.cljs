@@ -6,7 +6,7 @@
 
 (enable-console-print!)
 
-(def debug-mode false)
+(def debug-mode true)
 
 (defonce app
   (->>
@@ -59,7 +59,7 @@
       
       ;; a possible move
       (contains? (:possible-moves game) [row col])
-      (assoc space :class (str "space possible possible-move"))
+      (assoc space :class "space possible possible-move")
       
       ;; owned by current player
       (g/has-marble? @app (g/whose-turn @app) row col)
@@ -67,7 +67,12 @@
       
       ;; has an assigned color (it is in the game)
       color
-      (assoc space :class (str "space " color))
+      (if (= [row col] (:moved-to game))
+        (assoc space :class (str "space fade-in " color))
+        (assoc space :class (str "space " color)))
+
+      (= [row col] (:moved-from game))
+      (assoc space :class "space fade-in")
       
       ;; add no style
       :else space)))
@@ -92,12 +97,16 @@
   (when (contains? (:possible-moves @app) [row col])
     (let [[r1 c1] (:selected @app)]
       (swap! app merge (g/do-move @app r1 c1 row col))
-      (swap! app assoc :selected nil :possible-moves #{}))))
+      (swap! app assoc
+             :selected nil
+             :possible-moves #{}
+             :moved-to [row col]
+             :moved-from [r1 c1]))))
 
 (defn bot-battle
   []
   (when-not (g/winner @app)
-    (swap! app merge (g/comp-do-move @app 3))))
+    (swap! app merge (g/compute-move @app 3))))
 
 ;;;;;;;;;;
 ;; HTML ;;
@@ -137,8 +146,10 @@
    [:input 
     {:type "button"
      :value "COMP DO MOVE"
-     :on-click #(swap! app merge (g/comp-do-move @app 3))}]
-
+     :on-click #(let [[[r1 c1] [r2 c2]] (g/compute-move @app 3)]
+                  (mark-selected! r1 c1)
+                  (maybe-move! r2 c2))}]
+                       
    [:input
     {:type "button"
      :value "BATTLE OF THE BOTS"

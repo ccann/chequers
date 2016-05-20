@@ -54,9 +54,26 @@ body {
     50% { opacity: 0.3; }
 }
 
+@keyframes fadein {
+    from { opacity: 0; }
+    to { opacity: 1; } 
+}
+
+@keyframes fadeout {
+    from { opacity: 1; }
+    to {opacity: 0; }
+}
+
 .possible {
     animation: blinker 1.5s linear infinite;
     cursor: pointer;
+}
+
+.fade-in {
+    animation-name: fadein;
+    animation-duration: 1.5s;
+    animation-timing-function: linear;
+    animation-iteration-count: 1;
 }
 
 .console {
@@ -70,7 +87,7 @@ input {
     text-align: center;
     margin-left: auto;
     margin-right: auto;
-    display:block;
+    display: block;
 }
 
 /* SHADOW/GLOW TRANSITIONS */
@@ -108,3 +125,4 @@ input {
 .hvr-glow:hover, .hvr-glow:focus, .hvr-glow:active {
     box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
 }
+

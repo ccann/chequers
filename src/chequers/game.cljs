@@ -373,7 +373,7 @@
           (recur (next cs) new-alpha (conj vs v))
           vs)))))
 
-(defn comp-do-move
+(defn compute-move
   [game depth]
   (let [moves (all-moves game)
         _ (debug moves)
@@ -386,5 +386,5 @@
                                        (map vector scores)
                                        (sort-by first >)
                                        (first))]
-    (debug "COMP DO MOVE from" r1 c1 "to" r2 c2 "with score" score)
-    (do-move game r1 c1 r2 c2)))
+    (debug "COMP MOVE from" r1 c1 "to" r2 c2 "with score" score)
+    [[r1 c1] [r2 c2]]))
