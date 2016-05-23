@@ -103,10 +103,13 @@
              :moved-to [row col]
              :moved-from [r1 c1]))))
 
-(defn bot-battle
+(defn comp-do-move!
   []
-  (when-not (g/winner @app)
-    (swap! app merge (g/compute-move @app 3))))
+  (if (g/winner @app)
+    (info "player" (g/winner @app) "wins")
+    (let [[[r1 c1] [r2 c2]] (g/compute-move @app 0)]
+      (mark-selected! r1 c1)
+      (maybe-move! r2 c2))))
 
 ;;;;;;;;;;
 ;; HTML ;;
@@ -146,14 +149,12 @@
    [:input 
     {:type "button"
      :value "COMP DO MOVE"
-     :on-click #(let [[[r1 c1] [r2 c2]] (g/compute-move @app 3)]
-                  (mark-selected! r1 c1)
-                  (maybe-move! r2 c2))}]
+     :on-click comp-do-move!}]
                        
    [:input
     {:type "button"
      :value "BATTLE OF THE BOTS"
-     :on-click #(def interval (js/setInterval bot-battle 3000))}]
+     :on-click #(def interval (js/setInterval comp-do-move! 3000))}]
 
    [:input
     {:type "button"
@@ -163,8 +164,22 @@
 (r/render-component [hexagram] (. js/document (getElementById "app")))
 
 
+
 (defn on-js-reload []
   ;; optionally touch your app-state to force rerendering depending on
   ;; your application
   ;; (swap! app-state update-in [:__figwheel_counter] inc)
 )
+#_(let [game (g/game-board 2 :two-ten)
+                                  temp (get-in game [:players 0])
+                                  game (assoc-in game [:players 0] (get-in game [:players 3]))
+                                  game (assoc-in game [:players 3] temp)
+                                  game (g/do-move game 13 5 12 5)
+                                  game (g/do-move game 3 6 4 5)
+      [[r1 c1] [r2 c2]] (g/compute-move game 0)]
+  ;; [[r1 c1] [r2 c2]])
+  
+  (g/winner (g/do-move game r1 c1 r2 c2)))
+
+  
+

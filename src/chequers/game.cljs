@@ -1,6 +1,7 @@
 (ns chequers.game
   (:require [taoensso.timbre :refer-macros (log trace debug info warn error fatal spy)]))
 
+(enable-console-print!)
 
 ;;;;;;;;;;;;;
 ;; Players ;;
@@ -105,7 +106,7 @@
        15 (range 6 8)
        16 (range 6 7)}}})
 
-(defn- opp-star-corner
+(defn opp-star-corner
   "Return a map of the coordinates of the opposite star corner for this player."
   [game-type player]
   (get-in star-corners [game-type (opponent player)]))
@@ -134,8 +135,10 @@
 (defn- won
   "Return int of player who has won, or nil if no player has won."
   [game player]
-  (let [opp (opp-star-corner (:game-type game) player)
-        plr ((:players game) player)]
+  (let [opp (into {} (for [[k v] (opp-star-corner (:game-type game) player)]
+                       [k (set v)]))
+        plr (into {} (for [[k v] ((:players game) player)]
+                       [k (set v)]))]
     (when (= opp plr) player)))
 
 (defn winner
@@ -147,8 +150,6 @@
                 (remove nil?)
                 (seq))]
     (if ws (first ws) nil)))
-
-
 
 (defn whose-turn [game] (first (:turn-seq game)))
 (defn whose-turn-color [game] (get-in game [:colors (whose-turn game)]))
@@ -186,7 +187,6 @@
   (let [players (:turn-seq game)
         player (first (for [p players :when (has-marble? game p row col)] p))]
     (get (:colors game) player)))
-
 
 
 ;;;;;;;;;;;;;;
@@ -325,63 +325,96 @@
 (defn score-by-euclidean-distance
   "Return score of curr player's marble locations. Find the euclidean distance between each marble
   and the opposite corner, add them up, and normalize."
-  [game]
-  (let [marbs (marble-locs (whose-turn game) game)
-        corner (opp-star-corner (:game-type game) (whose-turn game))
-        location (first (for [[k v] (seq corner)
-                              :when (= (count v) 1)]
-                          [k (first v)]))
-        distances (map #(euclidean-distance % location) marbs)]
-    (->> distances 
-         (reduce +)
-         (/ 1)
-         (* 1000))))
+  [game player]
+  (let [game-type (:game-type game)
+        marb-coords (marble-locs player game)
+        star-coords (->> player
+                         (opp-star-corner game-type)
+                         (mapcat ->pair))
+        open-star-coords (clojure.set/difference (set star-coords) (set marb-coords))
+        pairs (map vector open-star-coords (for [sc open-star-coords]
+                                             (->> marb-coords
+                                                  (map #(euclidean-distance % sc))
+                                                  (reduce +))))
+        ;; _ (debug (map #(->> % (second) (/ 1) (* 10000))
+        ;;               (sort-by second > pairs)))
+        deepest (first (sort-by second > pairs))
+        distance (->> deepest (second) (/ 1) (* 1000))]
+    ;; (debug "deepest:" deepest)
+    ;; (debug "score:" distance)
+    distance))
 
-;; (time (negamax (game-board 2 :two-ten) 1 5))
-;; (time (negamax (do-move (game-board 2 :two-ten) 2 5 4 4) 1))
+;; (defn score-by-euclidean-distance
+;;   "Return score of curr player's marble locations. Find the euclidean distance between each marble
+;;   and the opposite corner, add them up, and normalize."
+;;   [game player]
+;;   (debug "game:" game)
+;;   (debug "whose turn:" (whose-turn game))
+;;   (let [marbs (marble-locs player game)
+;;         corner (opp-star-corner (:game-type game) player)
+;;         location (first (for [[k v] (seq corner)
+;;                               :when (= (count v) 1)]
+;;                           [k (first v)]))
+;;         distances (map #(euclidean-distance % location) marbs)
+;;         total (->> distances 
+;;                    (reduce +)
+;;                    (/ 1)
+;;                    (* 1000))]
+;;     (debug marbs)
+;;     (debug location)
+;;     (debug total)
+;;     total))
 
 (declare descend-tree)
 
 (defn negamax
   "Return the negamax of this node for player denoted by color."
-  ([node color] (negamax node color 4 (.-MIN_VALUE js/Number.) (.-MAX_VALUE js/Number.)))
-  ([node color depth] (negamax node color depth (.-MIN_VALUE js/Number.) (.-MAX_VALUE js/Number.)))
-  ([node color depth alpha beta]
+  ([node player color]
+   (negamax node player color 4 (.-MIN_VALUE js/Number.) (.-MAX_VALUE js/Number.)))
+  ([node player color depth]
+   (negamax node player color depth (.-MIN_VALUE js/Number.) (.-MAX_VALUE js/Number.)))
+  ([node player color depth alpha beta]
    ;; (println "node:" node)
    ;; (println "depth:" depth)
    ;; (println "alpha:" alpha "beta:" beta)
-   (if (or (= depth 0) (winner node))
-     (* color (score-by-euclidean-distance node))
+   ;; (debug "node:" node)
+   
+   (cond
+     (= (winner node) player)
+     (do (debug "WINNER NODE") (* color 1000000))
+     (= depth 0)
+     (-> node (score-by-euclidean-distance player) (* color))
+     :else
      (->> node
           (find-children)
-          (descend-tree depth alpha beta color)
+          (descend-tree player depth alpha beta color)
           (remove nil?)
           (cons alpha)
           (apply max)))))
 
 (defn- descend-tree
   "Return a list containing the negamax of each child-node."
-  [depth alpha beta color children]
+  [player depth alpha beta color children]
   (loop [cs children
          alpha alpha
          vs []]
     (if-not (seq cs) ;; base case, return values
       vs 
-      (let [v (- (negamax (first cs) (- color) (dec depth) (- beta) (- alpha)))
+      (let [v (- (negamax (first cs) player (- color) (dec depth) (- beta) (- alpha)))
             new-alpha (max alpha v)]
         (if (< new-alpha beta)
           (recur (next cs) new-alpha (conj vs v))
           vs)))))
 
 (defn compute-move
+  "Return a vector of move-from and move-to coordinate pairs."
   [game depth]
   (let [moves (all-moves game)
-        _ (debug moves)
+        player (whose-turn game)
         possible-states (->> moves
-                             (map flatten)
-                             (map #(apply do-move game %)))
-        scores (map #(negamax % 1 depth) possible-states)
-        _ (debug (sort > scores))
+                             (mapv flatten)
+                             (mapv #(apply do-move game %)))
+        scores (map #(do (negamax % player 1 depth)) possible-states)
         [score [[r1 c1] [r2 c2]]] (->> moves
                                        (map vector scores)
                                        (sort-by first >)
