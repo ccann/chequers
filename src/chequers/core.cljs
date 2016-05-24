@@ -1,6 +1,7 @@
 (ns chequers.core
   (:require [reagent.core :as r]
             [chequers.game :as g]
+            [chequers.ai :as ai]
             [taoensso.timbre :refer-macros (log  trace  debug  info  warn  error  fatal)]
             [garden.core :refer [css]]))
 
@@ -8,10 +9,10 @@
 
 (def debug-mode true)
 
-(defonce app
-  (->>
-   (g/game-board 2 :two-ten)
-   (r/atom)))
+(defonce app (r/atom (g/game-board 2 :two-ten)))
+
+(defonce disp (r/atom {:possible-moves #{}}))
+
 
 (defn ->hex
   "Return the hex value of the color denoted by the keyword."
@@ -54,24 +55,24 @@
         color (when color (name color))]
     (cond
       ;; currently selected
-      (= [row col] (:selected game))
+      (= [row col] (:selected @disp))
       (assoc space :class (str "space selected glow " color))
       
       ;; a possible move
-      (contains? (:possible-moves game) [row col])
+      (contains? (:possible-moves @disp) [row col])
       (assoc space :class "space possible possible-move")
       
       ;; owned by current player
-      (g/has-marble? @app (g/whose-turn @app) row col)
+      (g/has-marble? game (g/whose-turn game) row col)
       (assoc space :class (str "space owned hvr-glow " color))
       
       ;; has an assigned color (it is in the game)
       color
-      (if (= [row col] (:moved-to game))
+      (if (= [row col] (:moved-to @disp))
         (assoc space :class (str "space fade-in " color))
         (assoc space :class (str "space " color)))
 
-      (= [row col] (:moved-from game))
+      (= [row col] (:moved-from @disp))
       (assoc space :class "space fade-in")
       
       ;; add no style
@@ -83,33 +84,34 @@
   [row col]
   (let [curr-player (g/whose-turn @app)]
     (when (g/has-marble? @app curr-player row col)
-      (swap! app assoc
-             :selected [row col]
-             :possible-moves (as-> @app $
-                                 (g/moves-from $ row col)
-                                 (map second $)
-                                 (set $))))))
+      (swap! disp assoc :selected [row col])
+      (swap! disp assoc :possible-moves (->> (g/moves-from @app row col)
+                                             (map second)
+                                             (set))))))
 
 (defn maybe-move!
   "Move the :selected marble to (row, col) IFF the clicked marble at (row, col) is a
-  possible move. "
+  possible move; return bool indicating if we moved."
   [row col]
-  (when (contains? (:possible-moves @app) [row col])
-    (let [[r1 c1] (:selected @app)]
+  (when (contains? (:possible-moves @disp) [row col])
+    (let [[r1 c1] (:selected @disp)]
       (swap! app merge (g/do-move @app r1 c1 row col))
-      (swap! app assoc
+      (swap! disp assoc
              :selected nil
              :possible-moves #{}
              :moved-to [row col]
-             :moved-from [r1 c1]))))
+             :moved-from [r1 c1])
+      (js/clearInterval (:move-interval @disp))
+      true)))
 
 (defn comp-do-move!
   []
   (if (g/winner @app)
     (info "player" (g/winner @app) "wins")
-    (let [[[r1 c1] [r2 c2]] (g/compute-move @app 0)]
-      (mark-selected! r1 c1)
-      (maybe-move! r2 c2))))
+    (do 
+      (let [[[r1 c1] [r2 c2]] (ai/compute-move @app 3)]
+        (mark-selected! r1 c1)
+        (maybe-move! r2 c2)))))
 
 ;;;;;;;;;;
 ;; HTML ;;
@@ -123,9 +125,36 @@
   [:div (assoc-style
          {:class "space"
           :on-click #(do (mark-selected! r c)
-                         (maybe-move! r c))}
+                         (when (maybe-move! r c)
+                           (swap! disp assoc :move-interval
+                                  (js/setInterval comp-do-move! 1500))))}
          @app r c)
    [:div (when debug-mode (str r ", " c))]])
+
+(defn debug-buttons []
+  (when debug-mode
+    [:div 
+     [:input
+      {:type "button"
+       :value "RESET BOARD"
+       :on-click #(reset! app (g/game-board 2 :two-ten))}]
+
+     [:input 
+      {:type "button"
+       :value "COMP DO MOVE"
+       :on-click comp-do-move!}]
+     
+     [:input
+      {:type "button"
+       :value "BATTLE OF THE BOTS"
+       :on-click #(swap! disp assoc :move-interval
+                         (js/setInterval comp-do-move! 3000))}]
+
+     [:input
+      {:type "button"
+       :value "CEASE FIRE"
+       :on-click #(js/clearInterval (:move-interval @disp))}]]))
+
 
 (defn hexagram []
   [:div
@@ -141,25 +170,7 @@
    [:br]
    [console]
    [:br]
-   [:input
-    {:type "button"
-     :value "RESET BOARD"
-     :on-click #(reset! app (g/game-board 2 :two-ten))}]
-
-   [:input 
-    {:type "button"
-     :value "COMP DO MOVE"
-     :on-click comp-do-move!}]
-                       
-   [:input
-    {:type "button"
-     :value "BATTLE OF THE BOTS"
-     :on-click #(def interval (js/setInterval comp-do-move! 3000))}]
-
-   [:input
-    {:type "button"
-     :value "END BLOODSHED"
-     :on-click #(js/clearInterval interval)}]])
+   [debug-buttons]])
 
 (r/render-component [hexagram] (. js/document (getElementById "app")))
 
@@ -176,7 +187,7 @@
                                   game (assoc-in game [:players 3] temp)
                                   game (g/do-move game 13 5 12 5)
                                   game (g/do-move game 3 6 4 5)
-      [[r1 c1] [r2 c2]] (g/compute-move game 0)]
+      [[r1 c1] [r2 c2]] (ai/compute-move game 0)]
   ;; [[r1 c1] [r2 c2]])
   
   (g/winner (g/do-move game r1 c1 r2 c2)))
