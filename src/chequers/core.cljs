@@ -2,12 +2,15 @@
   (:require [reagent.core :as r]
             [chequers.game :as g]
             [chequers.ai :as ai]
-            [taoensso.timbre :refer-macros (log  trace  debug  info  warn  error  fatal)]
+            [taoensso.timbre :as t :refer-macros (log trace debug info warn error fatal)]
             [garden.core :refer [css]]))
 
 (enable-console-print!)
 
 (def debug-mode false)
+(if debug-mode
+  (t/set-level! :debug)
+  (t/set-level! :info))
 
 (defn new-game [] (g/game-board 2 10))
 
@@ -124,11 +127,12 @@
 (defn console []
   [:div.console
    (doall (for [[p c] (:colors @app)]
-            (let [cl (->> c name (str "space "))]
+            (let [cl (->> c name (str "turn-marble "))]
               ^{:key p}
-              [:div {:class (if (= p (g/whose-turn @app))
-                              (str cl " pulse")
-                              cl)}])))])
+              [:div
+               {:class (if (= p (g/whose-turn @app))
+                         (str cl " pulse")
+                         cl)}])))])
   
   ;; [:div.console "Turn: " (name (g/whose-turn-color @app))])
 
@@ -139,9 +143,9 @@
           :on-click #(do (mark-selected! r c)
                          (when (maybe-move! r c)
                            (swap! disp assoc :move-interval
-                                  (js/setInterval comp-do-move! 1500))))}
-         @app r c)
-   [:div (when debug-mode (str r ", " c))]])
+                                  (js/setInterval comp-do-move! 1500))))
+          :on-mouse-over #(debug [r c])}
+         @app r c)])
 
 (defn debug-buttons []
   (when debug-mode
@@ -166,18 +170,18 @@
 
 
 (defn hexagram []
-  [:div
+  [:div.page
    [:style backgrounds]
-   [:div.table
-    [:div
-     (doall (for [r (range 17)]
-              ^{:key r}
-              [:div.row
-               (doall (for [c (get g/star r)]
-                        (space r c)))]))]]
+   [:div.hexagram
+    (doall (for [r (range 17)]
+             ^{:key r}
+             [:div.row
+              (doall (for [c (get g/star r)]
+                       (space r c)))]))]
    [:br]
    [:br]
    [console]
+   [:div.rcircle]
    [:br]
    [debug-buttons]])
 
