@@ -7,10 +7,8 @@
 ;; Players ;;
 ;;;;;;;;;;;;;
 
-(def player-count 2)
-
 (def players [0 3 1 4 2 5])
-(def colors (->> [:blue :green :black :white :red :yellow :purple]))
+(def colors [:blue :green :black :white :red :yellow :purple])
 
 (defn- player-colors
   "Return a vec of player (int) and color keyword pairs."
@@ -65,66 +63,58 @@
    15 (range 6 8)
    16 (range 6 7)})
 
-
-;; 1 {4 (range 9 13)
-;;    5 (range 10 13)
-;;    6 (range 10 12)
-;;    7 (range 11 12)}
-;; 5 {4 (range 0 4)
-;;    5 (range 1 4)
-;;    6 (range 1 3)
-;;    7 (range 2 3)}
-;; 2 {9 (range 11 12)
-;;    10 (range 10 12)
-;;    11 (range 10 13)
-;;    12 (range 9 13)}
-;; 4 {9 (range 2 3)
-;;    10 (range 1 3)
-;;    11 (range 1 4)
-;;    12 (range 0 4)}
-
-
 (def star-corners
-  {:two-ten
-   {0 {0 (range 6 7)
-       1 (range 6 8)
-       2 (range 5 8)
-       3 (range 5 9)}
-    3 {13 (range 5 9)
-       14 (range 5 8)
-       15 (range 6 8)
-       16 (range 6 7)}}
-   :two-fifteen
-   {0 {0 (range 6 7)
-       1 (range 6 8)
-       2 (range 5 8)
-       3 (range 5 9)
-       4 (range 4 9)}
-    3 {12 (range 4 9)
-       13 (range 5 9)
-       14 (range 5 8)
-       15 (range 6 8)
-       16 (range 6 7)}}})
+  {10 {0 {0 (range 6 7)
+          1 (range 6 8)
+          2 (range 5 8)
+          3 (range 5 9)}
+       3 {13 (range 5 9)
+          14 (range 5 8)
+          15 (range 6 8)
+          16 (range 6 7)}
+       1 {4 (range 9 13)
+          5 (range 10 13)
+          6 (range 10 12)
+          7 (range 11 12)}
+       5 {4 (range 0 4)
+          5 (range 1 4)
+          6 (range 1 3)
+          7 (range 2 3)}
+       2 {9 (range 11 12)
+          10 (range 10 12)
+          11 (range 10 13)
+          12 (range 9 13)}
+       4 {9 (range 2 3)
+          10 (range 1 3)
+          11 (range 1 4)
+          12 (range 0 4)}}
+   15 {0 {0 (range 6 7)
+          1 (range 6 8)
+          2 (range 5 8)
+          3 (range 5 9)
+          4 (range 4 9)}
+       3 {12 (range 4 9)
+          13 (range 5 9)
+          14 (range 5 8)
+          15 (range 6 8)
+          16 (range 6 7)}}})
 
 (defn opp-star-corner
   "Return a map of the coordinates of the opposite star corner for this player."
-  [game-type player]
-  (get-in star-corners [game-type (opponent player)]))
+  [marbs-count player]
+  (get-in star-corners [marbs-count (opponent player)]))
 
 (defn game-board
   "Return a starting game-board for n players."
-  [n game-type]
-  (let [players (take n chequers.game/players)
-        colors-map (player-colors n)
-        g (as-> players $
-            (reduce #(assoc-in %1 [:players %2]
-                               (get-in star-corners [game-type %2])) {} $)
-            (assoc $
-                   :colors colors-map
-                   :game-type game-type
-                   :turn-seq players))]
-    (info g)
-    g))
+  [players-count marbs-count]
+  (let [players (take players-count chequers.game/players)
+        game (reduce #(assoc-in %1 [:players %2] (get-in star-corners [marbs-count %2])) {} players)
+        game (assoc game
+                    :colors (player-colors players-count)
+                    :marbs-count marbs-count
+                    :turn-seq players)]
+    (info game)
+    game))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Game Inquiries ;;
@@ -133,7 +123,7 @@
 (defn- won
   "Return int of player who has won, or nil if no player has won."
   [game player]
-  (let [opp (into {} (for [[k v] (opp-star-corner (:game-type game) player)]
+  (let [opp (into {} (for [[k v] (opp-star-corner (:marbs-count game) player)]
                        [k (set v)]))
         plr (into {} (for [[k v] ((:players game) player)]
                        [k (set v)]))]
@@ -247,7 +237,7 @@
         pairs (map vector rs cs)]
     pairs))
 
-;; (single-hops (game-board 2 :two-ten) 2 6)
+;; (single-hops (game-board 2 10) 2 6)
 
 (defn single-hop-moves
   "Return all moves via a single hop from this space as a vector of row col pairs."

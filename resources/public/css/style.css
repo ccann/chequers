@@ -2,47 +2,41 @@
 
 /* wood1 #f6e4ca */
 /* wood2 #f1d5b9 */
-/* wood3 #7d280b */
 
 body {
-    background: gray;
+    background: #808080;
     color: white;
-}
-
-.table {
-    /* display: table; */
-    border-spacing: 6px;
 }
 
 .row {
     text-align: center;
+    /* height: 2em; */
 }
 
 .space {
     display: inline-block;
-    margin-left: 5px;
-    margin-right: 5px;
+    margin-left: 4px;
+    margin-right: 4px;
+    background-color: #f1d5b9; /* wood2 */
+    box-shadow:inset 0px 0px 0px 0px;
+    /* min-width: 30px; */
+    /* min-height: 30px; */
+    /* width: 3vw; */
+    /* height: 3vw; */
+
+    width: 30px;
+    height: 30px;
+
+    /* shape -> circle */
+    -moz-border-radius: 50%;
+    -webkit-border-radius: 50%;
+    border-radius: 50%;
     
     /* for debug labels */
     font-size: 0.5em;
     text-align: center;
     line-height: 35px;
     color: black;
-
-    background-color: #f1d5b9; /* wood2 */
-    box-shadow:inset 0px 0px 0px 0px;
-    border-radius: 50%;
-    min-width: 30px;
-    min-height: 30px;
-    width: 35px;
-    height: 35px;
-    vertical-align: middle;
-}
-
-
-.selected {
-    
-    /* animation: blinker 1s linear infinite; */
 }
 
 .owned {
@@ -65,8 +59,11 @@ body {
 }
 
 .possible {
-    animation: blinker 1.5s linear infinite;
     cursor: pointer;
+}
+
+.possible:hover, .possible:focus, .possible:active {
+    background-color: #343434;                                      
 }
 
 .fade-in {
@@ -90,11 +87,9 @@ input {
     display: block;
 }
 
-/* SHADOW/GLOW TRANSITIONS */
 /* Glow */
 .glow {
     display: inline-block;
-    vertical-align: middle;
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
     box-shadow: 0 0 1px rgba(0, 0, 0, 0);
@@ -110,7 +105,6 @@ input {
 
 .hvr-glow {
     display: inline-block;
-    vertical-align: middle;
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
     box-shadow: 0 0 1px rgba(0, 0, 0, 0);
@@ -230,4 +224,47 @@ input {
     transform: scale(1.0);
     -webkit-transform: scale(1.0);
   }
+}
+
+/* Pulse */
+@-webkit-keyframes pulse {
+    25% {
+        -webkit-transform: scale(1.1);
+        transform: scale(1.1);
+    }
+
+    75% {
+        -webkit-transform: scale(0.9);
+        transform: scale(0.9);
+    }
+}
+
+@keyframes pulse {
+    25% {
+        -webkit-transform: scale(1.1);
+        transform: scale(1.1);
+    }
+
+    75% {
+        -webkit-transform: scale(0.9);
+        transform: scale(0.9);
+    }
+}
+
+.pulse {
+    display: inline-block;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    box-shadow: 0 0 1px rgba(0, 0, 0, 0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-animation-name: pulse;
+    animation-name: pulse;
+    -webkit-animation-duration: 1s;
+    animation-duration: 1s;
+    -webkit-animation-timing-function: linear;
+    animation-timing-function: linear;
+    -webkit-animation-iteration-count: infinite;
+    animation-iteration-count: infinite;
 }

@@ -1,5 +1,5 @@
 (ns chequers.ai 
-  (:require [taoensso.timbre :refer-macros (log trace debug info warn error)]
+  (:require [taoensso.timbre :refer-macros (log trace debug info warn error spy)]
             [chequers.game :as g]))
 
 ;; ap: add dpendency
@@ -35,6 +35,8 @@
 ;; Evaluation ;;
 ;;;;;;;;;;;;;;;;
 
+(def max-reward 1000000)
+
 (defn- find-children
   "Return all descendant-states of this game-state by making all possible moves."
   [game]
@@ -57,10 +59,9 @@
   "Return score of curr player's marble locations. Find the euclidean distance between each marble
   and the opposite corner, add them up, and normalize."
   [game player]
-  (let [game-type (:game-type game)
-        marb-coords (g/marble-locs player game)
+  (let [marb-coords (g/marble-locs player game)
         star-coords (->> player
-                         (g/opp-star-corner game-type)
+                         (g/opp-star-corner (:marbs-count game))
                          (mapcat g/->pair))
         open-star-coords (clojure.set/difference (set star-coords) (set marb-coords))
         pairs (map vector open-star-coords (for [sc open-star-coords]
@@ -112,7 +113,7 @@
    
    (cond
      (= (g/winner node) player)
-     (do (debug "WINNER NODE") (* color 1000000))
+     (do (debug "WINNER NODE") (* color max-reward))
      (= depth 0)
      (-> node (score-by-euclidean-distance player) (* color))
      :else
@@ -137,6 +138,20 @@
           (recur (next cs) new-alpha (conj vs v))
           vs)))))
 
+(defn ->move
+  [v]
+  {:score (first v)
+   :from (-> v second first)
+   :to (-> v second second)})
+
+(defn rand-move
+  [moves]
+  (if (= (-> moves first :score ) max-reward)
+    (first moves)
+    (let [candidates (take 3 moves)]
+      (debug "candidates:" candidates)
+      (rand-nth candidates))))
+
 (defn compute-move
   "Return a vector of move-from and move-to coordinate pairs."
   [game depth]
@@ -146,9 +161,10 @@
                              (mapv flatten)
                              (mapv #(apply g/do-move game %)))
         scores (map #(do (negamax % player 1 depth)) possible-states)
-        [score [[r1 c1] [r2 c2]]] (->> moves
-                                       (map vector scores)
-                                       (sort-by first >)
-                                       (first))]
-    (debug "COMP MOVE from" r1 c1 "to" r2 c2 "with score" score)
-    [[r1 c1] [r2 c2]]))
+        {:keys [score from to]} (->> moves
+                                     (map vector scores)
+                                     (sort-by first >)
+                                     (map ->move)
+                                     (rand-move))]
+    (debug "COMP MOVE from" from "to" to "with score" score)
+    [from to]))

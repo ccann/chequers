@@ -7,11 +7,14 @@
 
 (enable-console-print!)
 
-(def debug-mode true)
+(def debug-mode false)
 
-(defonce app (r/atom (g/game-board 2 :two-ten)))
+(defn new-game [] (g/game-board 2 10))
+
+(defonce app (r/atom (new-game)))
 
 (defonce disp (r/atom {:possible-moves #{}}))
+
 
 
 (defn ->hex
@@ -23,8 +26,7 @@
        :black ["#717171" "#242424" "#444444"]
        :purple ["#D8B6DF" "#AA76B5" "#571B64"]
        :blue ["#9FAABE" "#4D6BA7" "#122D63"]
-       :white ["#FFFFFF" "#E2E2E2" "#A3A39F"]
-       :possible-move ["#FD5F00" "#FD5F00" "#FD5F00"]}))
+       :white ["#FFFFFF" "#E2E2E2" "#A3A39F"]}))
 
 (defn- background-css
   [color]
@@ -42,8 +44,7 @@
         [:.black (background-css :black)]
         [:.purple (background-css :purple)]
         [:.blue (background-css :blue)]
-        [:.white (background-css :white)]
-        [:.possible-move (background-css :possible-move)]]
+        [:.white (background-css :white)]]
        (map flatten)
        (map vec)
        (apply css)))
@@ -60,7 +61,7 @@
       
       ;; a possible move
       (contains? (:possible-moves @disp) [row col])
-      (assoc space :class "space possible possible-move")
+      (assoc space :class "space possible possible-move hvr-glow")
       
       ;; owned by current player
       (g/has-marble? game (g/whose-turn game) row col)
@@ -108,17 +109,28 @@
   []
   (if (g/winner @app)
     (info "player" (g/winner @app) "wins")
-    (do 
-      (let [[[r1 c1] [r2 c2]] (ai/compute-move @app 3)]
-        (mark-selected! r1 c1)
-        (maybe-move! r2 c2)))))
+    (let [[[r1 c1] [r2 c2]] (ai/compute-move @app 3)]
+      (mark-selected! r1 c1)
+      (maybe-move! r2 c2))))
+
+
+;; (for [[p c] (:colors (g/game-board 2 :two-ten))]
+;;   [p c])
 
 ;;;;;;;;;;
 ;; HTML ;;
 ;;;;;;;;;;
 
 (defn console []
-  [:div.console "Turn: " (name (g/whose-turn-color @app))])
+  [:div.console
+   (doall (for [[p c] (:colors @app)]
+            (let [cl (->> c name (str "space "))]
+              ^{:key p}
+              [:div {:class (if (= p (g/whose-turn @app))
+                              (str cl " pulse")
+                              cl)}])))])
+  
+  ;; [:div.console "Turn: " (name (g/whose-turn-color @app))])
 
 (defn space [r c]
   ^{:key [r c]}
@@ -137,19 +149,16 @@
      [:input
       {:type "button"
        :value "RESET BOARD"
-       :on-click #(reset! app (g/game-board 2 :two-ten))}]
-
+       :on-click #(reset! app (new-game))}]
      [:input 
       {:type "button"
        :value "COMP DO MOVE"
        :on-click comp-do-move!}]
-     
      [:input
       {:type "button"
        :value "BATTLE OF THE BOTS"
        :on-click #(swap! disp assoc :move-interval
                          (js/setInterval comp-do-move! 3000))}]
-
      [:input
       {:type "button"
        :value "CEASE FIRE"
