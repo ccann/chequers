@@ -40,9 +40,10 @@
 (defn- find-children
   "Return all descendant-states of this game-state by making all possible moves."
   [game]
-  (let [moves (g/all-moves game)]
+  (let [moves (-> game g/all-moves shuffle)]
     (map (fn [[[r1 c1] [r2 c2]]] (g/do-move game r1 c1 r2 c2))
          moves)))
+
 
 ;; (find-children (game-board 2 :two-ten))
 
@@ -155,7 +156,7 @@
 (defn compute-move
   "Return a vector of move-from and move-to coordinate pairs."
   [game depth]
-  (let [moves (g/all-moves game)
+  (let [moves (-> game g/all-moves shuffle)
         player (g/whose-turn game)
         possible-states (->> moves
                              (mapv flatten)
