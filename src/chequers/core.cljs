@@ -2,23 +2,21 @@
   (:require [reagent.core :as r]
             [chequers.game :as g]
             [chequers.ai :as ai]
-            [taoensso.timbre :as t :refer-macros (log trace debug info warn error fatal)]
+            [taoensso.timbre :as t :refer-macros (log trace spy debug info warn error fatal)]
             [garden.core :refer [css]]))
 
 (enable-console-print!)
 
-(def debug-mode false)
+(def debug-mode true)
 (if debug-mode
   (t/set-level! :debug)
   (t/set-level! :info))
 
-(defn new-game [] (g/game-board 2 10))
+(defn new-game [] (g/game-board 2 15))
 
 (defonce app (r/atom (new-game)))
 
 (defonce disp (r/atom {:possible-moves #{}}))
-
-
 
 (defn ->hex
   "Return the hex value of the color denoted by the keyword."
@@ -60,15 +58,15 @@
     (cond
       ;; currently selected
       (= [row col] (:selected @disp))
-      (assoc space :class (str "space selected glow " color))
+      (assoc space :class (str "space owned glow " color))
       
       ;; a possible move
       (contains? (:possible-moves @disp) [row col])
-      (assoc space :class "space possible possible-move hvr-glow")
+      (assoc space :class "space possible hvr-glow")
       
       ;; owned by current player
       (g/has-marble? game (g/whose-turn game) row col)
-      (assoc space :class (str "space owned hvr-glow " color))
+      (assoc space :class (str "space owned " color))
       
       ;; has an assigned color (it is in the game)
       color
@@ -112,13 +110,9 @@
   []
   (if (g/winner @app)
     (info "player" (g/winner @app) "wins")
-    (let [[[r1 c1] [r2 c2]] (ai/compute-move @app 3)]
+    (let [[[r1 c1] [r2 c2]] (ai/compute-move @app 1)]
       (mark-selected! r1 c1)
       (maybe-move! r2 c2))))
-
-
-;; (for [[p c] (:colors (g/game-board 2 :two-ten))]
-;;   [p c])
 
 ;;;;;;;;;;
 ;; HTML ;;
@@ -126,15 +120,20 @@
 
 (defn console []
   [:div.console
-   (doall (for [[p c] (:colors @app)]
-            (let [cl (->> c name (str "turn-marble "))]
-              ^{:key p}
-              [:div
-               {:class (if (= p (g/whose-turn @app))
-                         (str cl " pulse")
-                         cl)}])))])
+   (let [curr-color (get (:colors @app) (g/whose-turn @app))
+         cl (->> curr-color name (str "turn-marble "))]
+     [:div {:class cl}])
+   [:form {:on-change #()}
+    [:fieldset
+     (-> [:select]
+         (concat (mapv #(vector :option %) (keys g/star-corners)))
+         (vec))]]
+   [:form {:on-change #()}
+    [:fieldset
+     (-> [:select]
+         (concat (mapv #(vector :option %) (range (count g/players))))
+         (vec))]]])
   
-  ;; [:div.console "Turn: " (name (g/whose-turn-color @app))])
 
 (defn space [r c]
   ^{:key [r c]}

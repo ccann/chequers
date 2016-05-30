@@ -2,50 +2,7 @@
   (:require [taoensso.timbre :refer-macros (log trace debug info warn error spy)]
             [chequers.game :as g]))
 
-;; ap: add dpendency
-;; fe: function from example
-;; am: add a missing libspec
-
-
-
-;; (defn negamax2 [node alpha beta color]
-;;   (let [node-value (eval-leaf node)]
-;;     (if node-value
-;;       (* color node-value)
-;;       (->> node
-;;            (find-children)
-;;            (map #(- (negamax2 % (- beta) (- alpha) (- color))))
-;;            (take-while #(< % beta))
-;;            (cons alpha)
-;;            (apply max)))))
-
-;; (time (negamax {:v 0} 1))
-
-
-;; ok so negamax gives the player the score for the node they are on. Which means that we look at
-;; each possible move (there are only a few, hopefully, and we call negamax on that node to get the
-;; maximum utility of moving to that place. Then we move to the best one!
-
-
-;; player A: color = 1
-
-
-
-;;;;;;;;;;;;;;;;
-;; Evaluation ;;
-;;;;;;;;;;;;;;;;
-
 (def max-reward 1000000)
-
-(defn- find-children
-  "Return all descendant-states of this game-state by making all possible moves."
-  [game]
-  (let [moves (-> game g/all-moves shuffle)]
-    (map (fn [[[r1 c1] [r2 c2]]] (g/do-move game r1 c1 r2 c2))
-         moves)))
-
-
-;; (find-children (game-board 2 :two-ten))
 
 (defn- euclidean-distance
   [[x1 y1] [x2 y2]]
@@ -54,11 +11,14 @@
       (Math/pow (- y1 y2) 2))
    0.5))
 
-;; (euclidean-distance [1 1] [1 3])
+(defn- find-children
+  "Return all descendant-states of this game-state by making all possible moves."
+  [game]
+  (let [moves (-> game g/all-moves shuffle)]
+    (map (fn [[[r1 c1] [r2 c2]]] (g/do-move game r1 c1 r2 c2))
+         moves)))
 
-(defn score-by-euclidean-distance
-  "Return score of curr player's marble locations. Find the euclidean distance between each marble
-  and the opposite corner, add them up, and normalize."
+(defn agg-distances
   [game player]
   (let [marb-coords (g/marble-locs player game)
         star-coords (->> player
@@ -69,34 +29,22 @@
                                              (->> marb-coords
                                                   (map #(euclidean-distance % sc))
                                                   (reduce +))))
-        ;; _ (debug (map #(->> % (second) (/ 1) (* 10000))
-        ;;               (sort-by second > pairs)))
-        deepest (first (sort-by second > pairs))
-        distance (->> deepest (second) (/ 1) (* 1000))]
-    ;; (debug "deepest:" deepest)
-    ;; (debug "score:" distance)
+        distance (->> pairs (sort-by second >) first second)]
     distance))
 
-;; (defn score-by-euclidean-distance
-;;   "Return score of curr player's marble locations. Find the euclidean distance between each marble
-;;   and the opposite corner, add them up, and normalize."
+;; (defn score-by-distance
+;;   "Return the score of the current game state for this player."
 ;;   [game player]
-;;   (debug "game:" game)
-;;   (debug "whose turn:" (whose-turn game))
-;;   (let [marbs (marble-locs player game)
-;;         corner (opp-star-corner (:game-type game) player)
-;;         location (first (for [[k v] (seq corner)
-;;                               :when (= (count v) 1)]
-;;                           [k (first v)]))
-;;         distances (map #(euclidean-distance % location) marbs)
-;;         total (->> distances 
-;;                    (reduce +)
-;;                    (/ 1)
-;;                    (* 1000))]
-;;     (debug marbs)
-;;     (debug location)
-;;     (debug total)
-;;     total))
+;;   (let [player-score (agg-distances game player)
+;;         opp-score (agg-distances game (g/opponent player))]
+;;     (- (- player-score) (- opp-score))))
+
+(defn score-by-distance
+  "Return the score of the current game state for this player."
+  [game player]
+  (let [d (* 1000 (/ 1 (agg-distances game player)))]
+    ;; (debug "score:" d)
+    d))
 
 (declare descend-tree)
 
@@ -116,7 +64,7 @@
      (= (g/winner node) player)
      (do (debug "WINNER NODE") (* color max-reward))
      (= depth 0)
-     (-> node (score-by-euclidean-distance player) (* color))
+     (-> node (score-by-distance player) (* color))
      :else
      (->> node
           (find-children)
@@ -133,24 +81,35 @@
          vs []]
     (if-not (seq cs) ;; base case, return values
       vs 
-      (let [v (- (negamax (first cs) player (- color) (dec depth) (- beta) (- alpha)))
+      (let [v (- (negamax
+                  (first cs)
+                  player
+                  (- color) 
+                  (dec depth)
+                  (- beta)
+                  (- alpha)))
             new-alpha (max alpha v)]
         (if (< new-alpha beta)
           (recur (next cs) new-alpha (conj vs v))
           vs)))))
 
+(defn- third [coll] (nth coll 2))
+
 (defn ->move
-  [v]
-  {:score (first v)
-   :from (-> v second first)
-   :to (-> v second second)})
+  [v player]
+  {:player player
+   :score (first v)
+   :state (second v)
+   :from (-> v third first)
+   :to (-> v third second)})
 
 (defn rand-move
   [moves]
-  (if (= (-> moves first :score ) max-reward)
+  (if (= (-> moves first :state g/winner)
+         (-> moves first :player))
     (first moves)
     (let [candidates (take 3 moves)]
-      (debug "candidates:" candidates)
+      (debug "candidates:" (map #(dissoc % :state) candidates))
       (rand-nth candidates))))
 
 (defn compute-move
@@ -163,9 +122,10 @@
                              (mapv #(apply g/do-move game %)))
         scores (map #(do (negamax % player 1 depth)) possible-states)
         {:keys [score from to]} (->> moves
-                                     (map vector scores)
+                                     (map vector scores possible-states)
                                      (sort-by first >)
-                                     (map ->move)
+                                     (map #(->move % player))
                                      (rand-move))]
-    (debug "COMP MOVE from" from "to" to "with score" score)
+    (debug "scores:" (sort > scores))
+    (info "COMP MOVE from" from "to" to "with score" score)
     [from to]))

@@ -16,7 +16,7 @@
   (let [cs (take n (shuffle chequers.game/colors))]
     (zipmap chequers.game/players cs)))
 
-(defn- opponent
+(defn opponent
   "Return the int representation of this player's opponent."
   [player]
   (-> player (+ 3) (mod 6)))
@@ -146,8 +146,9 @@
 
 (defn ->pair [[k vs]] (for [v vs] [k v]))
 
-(defn marble-locs [player game]
+(defn marble-locs
   "Return vector of row,col pairs for the locations of current player's marbles."
+  [player game]
   (let [marbles (get-in game [:players player])]
     (mapcat ->pair marbles)))
 
@@ -230,7 +231,7 @@
 
 (defn- single-hop-spaces
   "Return all spaces reachable via a single hop as a vector of row-col pairs.
-  Note: Does not check for adjacent marbles to hope over, just computes coordinates reachable via one hop."
+  Note: Does not check for adjacent marbles to hop over, just computes coordinates reachable via one hop."
   [row col]
   (let [rs [row       row       (- row 2) (- row 2) (+ row 2) (+ row 2)]
         cs [(- col 2) (+ col 2) (dec col) (inc col) (dec col) (inc col)]
@@ -273,9 +274,14 @@
 (defn moves-from
   "Return the vec of moves from this position by curr player."
   [game row col]
-  (let [all-moves (concat (single-step-moves game row col)
-                          (hop-moves game row col))]
-    (for [resulting-space all-moves]
+  (let [goal-corner (opp-star-corner (:marbs-count game) (whose-turn game))
+        in-goal-corner? #(contains? (set (get goal-corner %1)) %2)
+        all-moves (concat (single-step-moves game row col)
+                          (hop-moves game row col))
+        legal-moves (if (in-goal-corner? row col)
+                      (filter #(apply in-goal-corner? %) all-moves)
+                      all-moves)]
+    (for [resulting-space legal-moves]
       [[row col] resulting-space])))
 
 (defn all-moves
@@ -285,3 +291,7 @@
        (marble-locs (whose-turn game))
        (map #(apply moves-from game %))
        (apply concat)))
+
+
+;; test moves-from 
+;; 
