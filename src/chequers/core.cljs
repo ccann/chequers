@@ -116,7 +116,6 @@
              :moved-to [row col]
              :moved-from [r1 c1])
       (rotate-turn-marble!)
-      (js/clearInterval (:move-interval @disp))
       true)))
 
 (defn toggle-menu!
@@ -131,9 +130,16 @@
   []
   (if (g/winner @app)
     (info "player" (g/winner @app) "wins")
-    (let [[[r1 c1] [r2 c2]] (ai/compute-move @app 1)]
-      (do (mark-selected! r1 c1)
-          (js/setTimeout #(maybe-move! r2 c2) 100)))))
+    (let [[[r1 c1] [r2 c2]] (ai/compute-move @app 3)]
+      (debug r1 c1)
+      (js/setTimeout #(mark-selected! r1 c1) 100)
+      (js/setTimeout #(maybe-move! r2 c2) 100))))
+
+(defn player-do-move!
+  [r c]
+  (mark-selected! r c)
+  (when (maybe-move! r c)
+    (js/setTimeout comp-do-move! 1200)))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; HTML COMPONENTS ;;
@@ -154,10 +160,7 @@
   ^{:key [r c]}
   [:div (assoc-style
          {:class "space"
-          :on-click #(do (mark-selected! r c)
-                         (when (maybe-move! r c)
-                           (swap! disp assoc :move-interval
-                                  (js/setInterval comp-do-move! 1500))))
+          :on-click #(player-do-move! r c)
           :on-mouse-over #(debug [r c])}
          @app r c)])
 

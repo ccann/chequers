@@ -126,6 +126,6 @@
                                      (sort-by first >)
                                      (map #(->move % player))
                                      (rand-move))]
-    (debug "scores:" (sort > scores))
+    (info "scores:" (sort > scores))
     (info "COMP MOVE from" from "to" to "with score" score)
     [from to]))
