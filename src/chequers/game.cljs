@@ -8,7 +8,13 @@
 ;;;;;;;;;;;;;
 
 (def players [0 3 1 4 2 5])
-(def colors [:blue :green :black :white :red :yellow :purple])
+(def colors [:blue
+             :green
+             :black
+             :white
+             :red
+             ;; :yellow
+             :purple])
 
 (defn- player-colors
   "Return a vec of player (int) and color keyword pairs."
