@@ -3,7 +3,8 @@
             [chequers.game :as g]
             [chequers.ai :as ai]
             [taoensso.timbre :as t :refer-macros (log trace spy debug info warn error fatal)]
-            [garden.core :refer [css]]))
+            [garden.core :refer [css]]
+            [clojure.string :as str]))
 
 (enable-console-print!)
 
@@ -13,12 +14,15 @@
   (t/set-level! :debug)
   (t/set-level! :info))
 
-(defonce disp (r/atom {:game-players-count 2
+(defonce disp (r/atom {:game-triangles-count 2
                        :game-marbles-count 10
                        :turn-marble "pulse"}))
 
-(defn new-game [] (g/game-board (:game-players-count @disp)
-                                (:game-marbles-count @disp)))
+(defn new-game []
+  (assoc
+   (g/game-board (:game-triangles-count @disp)
+                 (:game-marbles-count @disp))
+   :game-ai-level 1))
 
 (defonce app (r/atom (new-game)))
 
@@ -130,7 +134,7 @@
   []
   (if (g/winner @app)
     (info "player" (g/winner @app) "wins")
-    (let [[[r1 c1] [r2 c2]] (ai/compute-move @app 3)]
+    (let [[[r1 c1] [r2 c2]] (ai/compute-move @app (:game-ai-level @app))]
       (debug r1 c1)
       (js/setTimeout #(mark-selected! r1 c1) 100)
       (js/setTimeout #(maybe-move! r2 c2) 100))))
@@ -152,7 +156,6 @@
          state (:turn-marble @disp)
          cl (->> curr-color name (str state " "))]
     [:div {:id "turn-marble" :class cl}]))
-
 
 (defn space
   "Return a component board space"
@@ -184,25 +187,26 @@
 
 
 (defn new-game-config
-  "Return component for new-game configuration form."
   []
   [:form {:class "pure-form pure-form-stacked"}
-   [:label {:for "players-count"} "Players"]
+   [:br]
+   [:label {:for "game-type"} "corners x marbles"]
    (-> [:select
-        {:id "players-count"
-         :on-change #(swap! disp assoc :game-players-count
-                            (-> % .-target .-value js/parseInt))}]
-       (concat (mapv #(vector :option %)
-                     (filterv even? (mapv inc (range (count g/players))))))
+        {:id "game-type"
+         :on-change #(do (swap! disp assoc :game-triangles-count
+                                (-> % .-target .-value (str/split #" x ") first js/parseInt))
+                         (swap! disp assoc :game-marbles-count
+                                (-> % .-target .-value (str/split #" x ") second js/parseInt)))}]
+       (concat (mapv #(vector :option %) ["2 x 10" "2 x 15" "4 x 10" "6 x 10"]))
        (vec))
-   [:fieldset
-    [:label {:for "marbs-count"} "Marbles"]
-    (-> [:select
-         {:id "marbs-count"
-          :on-change #(swap! disp assoc :game-marbles-count
-                             (-> % .-target .-value js/parseInt))}]
-        (concat (mapv #(vector :option %) (keys g/star-corners)))
-        (vec))]])
+   [:label {:for "ai-level"} "AI level"]
+   (-> [:select
+        {:id "ai-level"
+         :on-change #(swap! app assoc :game-ai-level (-> % .-target .-value js/parseInt))}]
+       (concat (mapv #(vector :option %) [1 2 3]))
+       (vec))])
+
+
 
 (defn sidebar-menu
   "Return component sidebar menu."
@@ -210,14 +214,13 @@
   [:div
    {:id "menu" :class (:menu-link @disp)}
    [:div.pure-menu
-    [:a.pure-menu-heading
-     {:href "https://github.com/ccann/chequers"}
-     "ccann/chequers"]
+    [:a.pure-menu-heading {:href "https://github.com/ccann/chequers"} "ccann/chequers"]
      [:ul.pure-menu-list
       [:li.pure-menu-item
        [new-game-config]]
       [:li.pure-menu-item
-       [:input {:class "pure-button"
+       [:input {:id "new-game"
+                :class "pure-button"
                 :type "button"
                 :value "New Game"
                 :on-click #(reset! app (new-game))}]]]]])

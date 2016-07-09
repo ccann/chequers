@@ -34,7 +34,7 @@
     left: 0;
     bottom: 0;
     z-index: 1000; /* so the menu or its navicon stays above all content */
-    background: #191818;
+    background: #333333;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -61,7 +61,7 @@
 */
 #menu .pure-menu ul,
 #menu .pure-menu .menu-item-divided {
-    border-top: 1px solid #333;
+    border-top: 1px solid #666666;
 }
 /*
         Change color of the anchor links on hover/focus.
@@ -90,7 +90,7 @@
 */
 #menu .pure-menu-heading {
     font-size: 110%;
-    color: #fff;
+    color: #FFB85F;
     margin: 0;
     text-transform: lowercase;
     font-family: monospace;
@@ -208,3 +208,18 @@ Hides the menu at `48em`, but modify this based on your app's needs.
         left: 150px;
     }
 }
+
+#game-type{
+    font-size: 1em;
+    margin-bottom: 2em;
+    border-color: #FFB85F;
+}
+
+
+#new-game {
+    /* background-color: #8ED2C9; */
+    background-color: #FFB85F;
+}
+
+
+

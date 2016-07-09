@@ -110,6 +110,8 @@
   [marbs-count player]
   (get-in star-corners [marbs-count (opponent player)]))
 
+(defn- rotate-seq [n s] (lazy-cat (drop n s) (take n s)))
+
 (defn game-board
   "Return a starting game-board for n players."
   [players-count marbs-count]
@@ -118,7 +120,7 @@
         game (assoc game
                     :colors (player-colors players-count)
                     :marbs-count marbs-count
-                    :turn-seq players)]
+                    :turn-seq (if (= 1 (rand-int 2)) (rotate-seq 1 players) players))]
     (info game)
     game))
 
@@ -147,7 +149,6 @@
 
 (defn whose-turn [game] (first (:turn-seq game)))
 (defn whose-turn-color [game] (get-in game [:colors (whose-turn game)]))
-(defn- rotate-seq [n s] (lazy-cat (drop n s) (take n s)))
 (defn next-turn [game] (update-in game [:turn-seq] #(rotate-seq 1 %)))
 
 (defn ->pair [[k vs]] (for [v vs] [k v]))
