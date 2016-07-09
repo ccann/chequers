@@ -21,7 +21,7 @@ Total Triangles | Triangles / Player | Marbles
 
 The turn sequence is clockwise by home triangle, i.e. in a 4 star point game assuming human controls North star point:
 
-img
+<img src="turn-seq.png" alt="turn-seq" width=300/>
 
 The color of the marble floating in the top right corner denotes the current turn.
 
