@@ -1,5 +1,7 @@
 # chequers
 
+[Play Here](http://ccann.github.io/chequers/)
+
 Chinese Chequers
 
 Reference: http://www.mastersgames.com/rules/chinese-checkers-rules.htm
