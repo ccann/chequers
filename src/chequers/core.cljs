@@ -1,45 +1,44 @@
 (ns chequers.core
-  (:require [reagent.core :as r]
+  (:require [chequers.ai :as ai]
             [chequers.game :as g]
-            [chequers.ai :as ai]
-            [taoensso.timbre :as t :refer-macros (log trace spy debug info warn error fatal)]
+            [clojure.string :as s]
             [garden.core :refer [css]]
-            [clojure.string :as str]))
+            [reagent.core :as r]
+            [taoensso.timbre
+             :as
+             t
+             :refer-macros
+             [debug error fatal info log spy trace warn]]))
 
 (enable-console-print!)
 
-(def debug-mode false)
-
-(if debug-mode
-  (t/set-level! :debug)
-  (t/set-level! :info))
+(t/set-level! :info)
 
 (defonce disp (r/atom {:game-triangles-count 2
                        :game-marbles-count 10
                        :turn-marble "pulse"}))
 
 (defn new-game []
-  (assoc
-   (g/game-board (:game-triangles-count @disp)
-                 (:game-marbles-count @disp))
-   :game-ai-level 1))
+  (g/game-board
+   (:game-triangles-count @disp)
+   (:game-marbles-count @disp)))
 
 (defonce app (r/atom (new-game)))
 
-(defn ->hex
+(defn hex
   "Return the hex value of the color denoted by the keyword."
   [kw]
-  (kw {:green ["#95CBB4" "#539C7D" "#002616"]
+  (kw {:green  ["#95CBB4" "#539C7D" "#002616"]
        :yellow ["#FFF9BA" "#F0E14B" "#575011"]
-       :red ["#FFA990" "#DD7354" "#6E1B03"]
-       :black ["#717171" "#242424" "#444444"]
+       :red    ["#FFA990" "#DD7354" "#6E1B03"]
+       :black  ["#717171" "#242424" "#444444"]
        :purple ["#D8B6DF" "#AA76B5" "#571B64"]
-       :blue ["#9FAABE" "#4D6BA7" "#122D63"]
-       :white ["#FFFFFF" "#E2E2E2" "#A3A39F"]}))
+       :blue   ["#9FAABE" "#4D6BA7" "#122D63"]
+       :white  ["#FFFFFF" "#E2E2E2" "#A3A39F"]}))
 
 (defn- background-css
   [color]
-  (let [[a b c] (->hex color)]
+  (let [[a b c] (hex color)]
     [{:background b}
      {:background (str "-webkit-radial-gradient(circle, " a ", " b ", " c ")")}
      {:background (str "-o-radial-gradient(circle, " a ", " b ", " c ")")}
@@ -47,13 +46,13 @@
      {:background (str "radial-gradient(circle, " a ", " b ", " c ")")}]))
 
 (def backgrounds
-  (->> [[:.green (background-css :green)]
-        [:.red (background-css :red)]              
+  (->> [[:.green  (background-css :green)]
+        [:.red    (background-css :red)]              
         [:.yellow (background-css :yellow)]
-        [:.black (background-css :black)]
+        [:.black  (background-css :black)]
         [:.purple (background-css :purple)]
-        [:.blue (background-css :blue)]
-        [:.white (background-css :white)]]
+        [:.blue   (background-css :blue)]
+        [:.white  (background-css :white)]]
        (map flatten)
        (map vec)
        (apply css)))
@@ -94,12 +93,116 @@
     (swap! disp assoc :turn-marble "wobble-horizontal")
     (js/setTimeout #(swap! disp assoc :turn-marble "pulse") 1100)))
 
+
+(defn curr-turn
+  "Return a component marble denoting current turn."
+  []
+  (let [curr-color (get (:colors @app) (g/whose-turn @app))
+        state      (:turn-marble @disp)
+        cl         (->> curr-color name (str state " "))]
+    [:div {:id "turn-marble" :class cl}]))
+
+(defn space
+  "Return a component board space"
+  [r c]
+  ^{:key [r c]}
+  [:div (assoc-style
+         {:class "space"
+          :on-click #(player-do-move! r c)
+          :on-mouse-over #(debug [r c])}
+         @app r c)])
+
+(defn debug-buttons
+  []
+  [:div 
+   [:input 
+    {:type "button"
+     :value "COMP DO MOVE"
+     :on-click comp-do-move!}]
+   [:input
+    {:type "button"
+     :value "BATTLE OF THE BOTS"
+     :on-click #(swap! disp assoc :move-interval
+                       (js/setInterval comp-do-move! 3000))}]
+   [:input
+    {:type "button"
+     :value "CEASE FIRE"
+     :on-click #(js/clearInterval (:move-interval @disp))}]])
+
+
+(defn new-game-config
+  []
+  [:form {:class "pure-form pure-form-stacked"}
+   [:br]
+   [:label {:for "game-type"} "corners x marbles"]
+   (-> [:select
+        {:id "game-type"
+         :on-change #(do (swap! disp assoc :game-triangles-count
+                                (-> % .-target .-value (s/split #" x ") first js/parseInt))
+                         (swap! disp assoc :game-marbles-count
+                                (-> % .-target .-value (s/split #" x ") second js/parseInt)))}]
+       (concat (mapv #(vector :option %) ["2 x 10" "2 x 15" "4 x 10" "6 x 10"]))
+       (vec))
+   [:label {:for "ai-level"} "AI level"]
+   (-> [:select
+        {:id "ai-level"
+         :on-change #(swap! app assoc :ai-level (-> % .-target .-value js/parseInt))}]
+       (concat (mapv #(vector :option %) [1 2 3]))
+       (vec))])
+
+(defn sidebar-menu
+  "Return component sidebar menu."
+  []
+  [:div
+   {:id "menu" :class (:menu-link @disp)}
+   [:div.pure-menu
+    [:a.pure-menu-heading {:href "https://github.com/ccann/chequers"} "ccann/chequers"]
+     [:ul.pure-menu-list
+      [:li.pure-menu-item
+       [new-game-config]]
+      [:li.pure-menu-item
+       [:input {:id "new-game"
+                :class "pure-button"
+                :type "button"
+                :value "New Game"
+                :on-click #(reset! app (new-game))}]]]]])
+
+(defn toggle-menu!
+  "Toggle the menu hide/display"
+  []
+  (let [curr (:menu-link @disp)]
+    (if (= curr "active")
+      (swap! disp assoc :menu-link nil)
+      (swap! disp assoc :menu-link "active"))))
+
+(defn page
+  "Return component page, the root of the HTML."
+  []
+  [:div {:id "layout" :class (:menu-link @disp)}
+   [:a.menu-link {:id "menu-link"
+                  :class (:menu-link @disp)
+                  :href "#menu"
+                  :on-click toggle-menu!} [:span]]
+   [sidebar-menu]
+   [:div.page
+    [:style backgrounds]
+    [:div.hexagram
+     (doall (for [r (range 17)]
+              ^{:key r}
+              [:div.row
+               (doall (for [c (get g/star r)]
+                        (space r c)))]))]
+    [curr-turn]
+    ;; [debug-buttons]
+    ]])
+
+
 (defn mark-selected!
   "Mark the marble at (row, col) as :selected and all spaces reachable from (row, col)
   as :possible-moves"
   [row col]
-  (let [curr-player (g/whose-turn @app)]
-    (when (g/has-marble? @app curr-player row col)
+  (let [player (g/whose-turn @app)]
+    (when (g/has-marble? @app player row col)
       (swap! disp assoc 
              :selected [row col]
              :possible-moves (->> (g/moves-from @app row col)
@@ -122,19 +225,11 @@
       (rotate-turn-marble!)
       true)))
 
-(defn toggle-menu!
-  "Toggle the menu hide/display"
-  []
-  (let [curr (:menu-link @disp)]
-    (if (= curr "active")
-      (swap! disp assoc :menu-link nil)
-      (swap! disp assoc :menu-link "active"))))
-
 (defn comp-do-move!
   []
   (if (g/winner @app)
     (info "player" (g/winner @app) "wins")
-    (let [[[r1 c1] [r2 c2]] (ai/compute-move @app (:game-ai-level @app))]
+    (let [[[r1 c1] [r2 c2]] (ai/compute-move @app (:ai-level @app))]
       (debug r1 c1)
       (js/setTimeout #(mark-selected! r1 c1) 100)
       (js/setTimeout #(maybe-move! r2 c2) 100))))
@@ -145,105 +240,6 @@
   (when (maybe-move! r c)
     (js/setTimeout comp-do-move! 1200)))
 
-;;;;;;;;;;;;;;;;;;;;;
-;; HTML COMPONENTS ;;
-;;;;;;;;;;;;;;;;;;;;;
-
-(defn curr-turn
-  "Return a component marble denoting current turn."
-  []
-  (let [curr-color (get (:colors @app) (g/whose-turn @app))
-         state (:turn-marble @disp)
-         cl (->> curr-color name (str state " "))]
-    [:div {:id "turn-marble" :class cl}]))
-
-(defn space
-  "Return a component board space"
-  [r c]
-  ^{:key [r c]}
-  [:div (assoc-style
-         {:class "space"
-          :on-click #(player-do-move! r c)
-          :on-mouse-over #(debug [r c])}
-         @app r c)])
-
-(defn debug-buttons
-  []
-  (when debug-mode
-    [:div 
-     [:input 
-      {:type "button"
-       :value "COMP DO MOVE"
-       :on-click comp-do-move!}]
-     [:input
-      {:type "button"
-       :value "BATTLE OF THE BOTS"
-       :on-click #(swap! disp assoc :move-interval
-                         (js/setInterval comp-do-move! 3000))}]
-     [:input
-      {:type "button"
-       :value "CEASE FIRE"
-       :on-click #(js/clearInterval (:move-interval @disp))}]]))
-
-
-(defn new-game-config
-  []
-  [:form {:class "pure-form pure-form-stacked"}
-   [:br]
-   [:label {:for "game-type"} "corners x marbles"]
-   (-> [:select
-        {:id "game-type"
-         :on-change #(do (swap! disp assoc :game-triangles-count
-                                (-> % .-target .-value (str/split #" x ") first js/parseInt))
-                         (swap! disp assoc :game-marbles-count
-                                (-> % .-target .-value (str/split #" x ") second js/parseInt)))}]
-       (concat (mapv #(vector :option %) ["2 x 10" "2 x 15" "4 x 10" "6 x 10"]))
-       (vec))
-   [:label {:for "ai-level"} "AI level"]
-   (-> [:select
-        {:id "ai-level"
-         :on-change #(swap! app assoc :game-ai-level (-> % .-target .-value js/parseInt))}]
-       (concat (mapv #(vector :option %) [1 2 3]))
-       (vec))])
-
-
-
-(defn sidebar-menu
-  "Return component sidebar menu."
-  []
-  [:div
-   {:id "menu" :class (:menu-link @disp)}
-   [:div.pure-menu
-    [:a.pure-menu-heading {:href "https://github.com/ccann/chequers"} "ccann/chequers"]
-     [:ul.pure-menu-list
-      [:li.pure-menu-item
-       [new-game-config]]
-      [:li.pure-menu-item
-       [:input {:id "new-game"
-                :class "pure-button"
-                :type "button"
-                :value "New Game"
-                :on-click #(reset! app (new-game))}]]]]])
-
-(defn page
-  "Return component page, the root of the HTML."
-  []
-  [:div {:id "layout" :class (:menu-link @disp)}
-   [:a.menu-link {:id "menu-link"
-                  :class (:menu-link @disp)
-                  :href "#menu"
-                  :on-click toggle-menu!} [:span]]
-   [sidebar-menu]
-   [:div.page
-    [:style backgrounds]
-    [:div.hexagram
-     (doall (for [r (range 17)]
-              ^{:key r}
-              [:div.row
-               (doall (for [c (get g/star r)]
-                        (space r c)))]))]
-    [curr-turn]
-    [debug-buttons]]])
 
 (r/render-component [page] (. js/document (getElementById "app")))
 

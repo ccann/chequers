@@ -116,11 +116,14 @@
   "Return a starting game-board for n players."
   [players-count marbs-count]
   (let [players (take players-count chequers.game/players)
-        game (reduce #(assoc-in %1 [:players %2] (get-in star-corners [marbs-count %2])) {} players)
-        game (assoc game
-                    :colors (player-colors players-count)
-                    :marbs-count marbs-count
-                    :turn-seq (if (= 1 (rand-int 2)) (rotate-seq 1 players) players))]
+        game    (reduce #(assoc-in %1 [:players %2]
+                                   (get-in star-corners [marbs-count %2]))
+                        {} players)
+        game    (assoc game
+                       :colors (player-colors players-count)
+                       :marbs-count marbs-count
+                       :turn-seq (if (= 1 (rand-int 2)) (rotate-seq 1 players) players)
+                       :ai-level 1)]
     (info game)
     game))
 
@@ -193,9 +196,9 @@
 (defn- adjacent-spaces
   "Return all spaces reachable via a single step as a vec of row-col pairs."
   [row col]
-  (let [ev (even? row)
-        pairs [[row (dec col)]
-               [row (inc col)]
+  (let [ev    (even? row)
+        pairs [[row       (dec col)]
+               [row       (inc col)]
                [(dec row) (if ev col (dec col))]
                [(dec row) (if ev (inc col) col)]
                [(inc row) (if ev col (dec col))]
@@ -214,11 +217,17 @@
   "Return game with current player's marble at (r1, c1) moved to (r2, c2)."
   [game r1 c1 r2 c2]
   (cond (not (and (legal-space? r2 c2) (legal-space? r1 c1)))
-        (do (error "Illegal move!" r1 c1 "to" r2 c2) game)
+        (do
+          (error "Illegal move!" r1 c1 "to" r2 c2)
+          game)
         (occupied-space? game r2 c2 )
-        (do (error r2 c2 "is occupied, can't move into it!") game)
+        (do
+          (error r2 c2 "is occupied, can't move into it!")
+          game)
         (not (occupied-space? game r1 c1))
-        (do (error r1 c1 "is not occupied, can't move out of it!") game)
+        (do
+          (error r1 c1 "is not occupied, can't move out of it!")
+          game)
         :else
         (let [plyr (whose-turn game)]
           (-> game
@@ -248,25 +257,25 @@
 ;; (single-hops (game-board 2 10) 2 6)
 
 (defn single-hop-moves
-  "Return all moves via a single hop from this space as a vector of row col pairs."
+  "Return all moves via a single hop from this space as a set of row col pairs."
   [game row col]
   (let [neighbors (adjacent-spaces row col)
-        one-hops (single-hop-spaces row col)
-        pairs (map vector neighbors one-hops)]
-    (for [[neighbor hop] pairs
-          :when (and
-                 (apply legal-space? neighbor)
-                 (apply legal-space? hop)
-                 (apply occupied-space? game neighbor)
-                 (not (apply occupied-space? game hop)))]
-      hop)))
+        one-hops  (single-hop-spaces row col)]
+    (set
+     (for [[neighbor hop] (map vector neighbors one-hops)
+           :when          (and
+                           (apply legal-space? neighbor)
+                           (apply legal-space? hop)
+                           (apply occupied-space? game neighbor)
+                           (not (apply occupied-space? game hop)))]
+       hop))))
 
 
 (defn- consecutive-hops
   [game [row col] visited]
   (let [destinations (set (single-hop-moves game row col))
-        to-visit (set (remove #(contains? (set visited) %) destinations))
-        new-visited (clojure.set/union destinations visited)]
+        to-visit     (set (remove #(contains? (set visited) %) destinations))
+        new-visited  (clojure.set/union destinations visited)]
     (if (empty? to-visit)
       visited
       (set (mapcat #(consecutive-hops (apply move game row col %) % new-visited)
@@ -281,24 +290,22 @@
 (defn moves-from
   "Return the vec of moves from this position by curr player."
   [game row col]
-  (let [goal-corner (opp-star-corner (:marbs-count game) (whose-turn game))
+  (let [goal-corner     (opp-star-corner (:marbs-count game) (whose-turn game))
         in-goal-corner? #(contains? (set (get goal-corner %1)) %2)
-        all-moves (concat (single-step-moves game row col)
-                          (hop-moves game row col))
-        legal-moves (if (in-goal-corner? row col)
-                      (filter #(apply in-goal-corner? %) all-moves)
-                      all-moves)]
+        moves           (concat (single-step-moves game row col)
+                                (hop-moves game row col))
+        legal-moves     (if (in-goal-corner? row col)
+                          (filter #(apply in-goal-corner? %) moves)
+                          moves)]
     (for [resulting-space legal-moves]
       [[row col] resulting-space])))
 
 (defn all-moves
-  "Return vec of all possible moves for the curr player."
+  "Return seq of all possible moves for the curr player."
   [game]
-  (->> game
-       (marble-locs (whose-turn game))
-       (map #(apply moves-from game %))
-       (apply concat)))
-
-
-;; test moves-from 
-;; 
+  (let [player         (whose-turn game)
+        possible-moves #(apply moves-from game %)]
+    (->> game
+         (marble-locs player)
+         (map possible-moves)
+         (apply concat))))

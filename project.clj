@@ -5,15 +5,14 @@
   :min-lein-version "2.6.1"
   
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.8.51"]
+                 [org.clojure/clojurescript "1.9.89" :scope "provided"]
+                 [reagent "0.6.0-rc"]
                  [org.clojure/core.async "0.2.374"
                   :exclusions [org.clojure/tools.reader]]
                  [com.taoensso/timbre "4.3.1"]
-                 [reagent "0.6.0-alpha2"]
                  [garden "1.3.2"]]
   
-  :plugins [[lein-figwheel "0.5.3-1"]
-            [lein-cljsbuild "1.1.3" :exclusions [[org.clojure/clojure]]]]
+  :plugins [[lein-cljsbuild "1.1.3"]]
 
   :source-paths ["src"]
 
@@ -37,11 +36,13 @@
                {:id "min"
                 :source-paths ["src"]
                 :compiler {:output-to "resources/public/js/compiled/chequers.js"
+                           :output-dir "target"
                            :main chequers.core
                            :optimizations :advanced
+                           :source-map-timestamp true
                            :pretty-print false}}]}
 
-  :figwheel {;; :http-server-root "public" ;; default and assumes "resources"
+  :figwheel { ;; :http-server-root "public" ;; default and assumes "resources"
              ;; :server-port 3449 ;; default
              ;; :server-ip "127.0.0.1"
 
@@ -75,20 +76,28 @@
              ;; to configure a different figwheel logfile path
              ;; :server-logfile "tmp/logs/figwheel-logfile.log"
              }
-
+  :repl-options {:init-ns user}
  
   ;; setting up nREPL for Figwheel and ClojureScript dev
   ;; Please see:
   ;; https://github.com/bhauman/lein-figwheel/wiki/Using-the-Figwheel-REPL-within-NRepl
   
-  :profiles {:dev {:dependencies [[figwheel-sidecar "0.5.3-1"]                                   
-                                  [com.cemerick/piggieback "0.2.1"]]
-                   ;; need to add dev source path here to get user.clj loaded
-                   :source-paths ["src" "dev"]
-                   ;; for CIDER
-                   ;; :plugins [[cider/cider-nrepl "0.12.0"]]
-                   :repl-options {; for nREPL dev you really need to limit output
-                                  :init (set! *print-length* 50)
-                                  :nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}}}
+  :profiles {:dev
+             {:dependencies [[figwheel "0.5.4-4"]
+                             [figwheel-sidecar "0.5.4-4"]
+                             [com.cemerick/piggieback "0.2.1"]
+                             [org.clojure/tools.nrepl "0.2.12"]]
 
-)
+              :plugins [[lein-figwheel "0.5.4-4"]
+                        [lein-doo "0.1.6"]]
+
+              :source-paths ["dev" "src"]
+              :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]
+                             :init (set! *print-length* 50)}}
+
+             :uberjar
+             {:source-paths ^:replace ["src/clj" "src/cljc"]
+              :prep-tasks ["compile" ["cljsbuild" "once" "min"]]
+              :hooks []
+              :omit-source true
+              :aot :all}})

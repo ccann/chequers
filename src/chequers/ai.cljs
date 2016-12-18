@@ -25,10 +25,11 @@
                          (g/opp-star-corner (:marbs-count game))
                          (mapcat g/->pair))
         open-star-coords (clojure.set/difference (set star-coords) (set marb-coords))
-        pairs (map vector open-star-coords (for [sc open-star-coords]
-                                             (->> marb-coords
-                                                  (map #(euclidean-distance % sc))
-                                                  (reduce +))))
+        pairs (map vector open-star-coords
+                   (for [sc open-star-coords]
+                     (->> marb-coords
+                          (map #(euclidean-distance % sc))
+                          (reduce +))))
         distance (->> pairs (sort-by second >) first second)]
     distance))
 
@@ -42,9 +43,10 @@
 (defn score-by-distance
   "Return the score of the current game state for this player."
   [game player]
-  (let [d (* 1000 (/ 1 (agg-distances game player)))]
-    ;; (debug "score:" d)
-    d))
+  (->> player
+       (agg-distances game)
+       (/ 1)
+       (* 1000)))
 
 (declare descend-tree)
 
@@ -75,33 +77,27 @@
 
 (defn- descend-tree
   "Return a list containing the negamax of each child-node."
-  [player depth alpha beta color children]
-  (loop [cs children
-         alpha alpha
-         vs []]
-    (if-not (seq cs) ;; base case, return values
-      vs 
-      (let [v (- (negamax
-                  (first cs)
-                  player
-                  (- color) 
-                  (dec depth)
-                  (- beta)
-                  (- alpha)))
-            new-alpha (max alpha v)]
-        (if (< new-alpha beta)
-          (recur (next cs) new-alpha (conj vs v))
-          vs)))))
+  [player depth α β color children]
+  (loop [children children
+         α        α
+         values   []]
+    (if children
+      (let [value (- (negamax (first children) player (- color) (dec depth) (- β) (- α)))
+            new-α (max α v)]
+        (if (< new-α β)
+          (recur (next children) new-α (conj vs value))
+          values))
+      values)))
 
 (defn- third [coll] (nth coll 2))
 
 (defn ->move
   [v player]
   {:player player
-   :score (first v)
-   :state (second v)
-   :from (-> v third first)
-   :to (-> v third second)})
+   :score  (first v)
+   :state  (second v)
+   :from   (-> v third first)
+   :to     (-> v third second)})
 
 (defn rand-move
   [moves]
@@ -115,12 +111,12 @@
 (defn compute-move
   "Return a vector of move-from and move-to coordinate pairs."
   [game depth]
-  (let [moves (-> game g/all-moves shuffle)
-        player (g/whose-turn game)
-        possible-states (->> moves
-                             (mapv flatten)
-                             (mapv #(apply g/do-move game %)))
-        scores (map #(do (negamax % player 1 depth)) possible-states)
+  (let [moves                   (-> game g/all-moves shuffle)
+        player                  (g/whose-turn game)
+        possible-states         (->> moves
+                                     (mapv flatten)
+                                     (mapv #(apply g/do-move game %)))
+        scores                  (map #(do (negamax % player 1 depth)) possible-states)
         {:keys [score from to]} (->> moves
                                      (map vector scores possible-states)
                                      (sort-by first >)
