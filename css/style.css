@@ -1,0 +1,114 @@
+
+/* wood1 #f6e4ca */
+/* wood2 #f1d5b9 */
+
+body {
+    background: #5c5c5c;
+    color: white;
+}
+
+.page {
+    text-align:center;
+    min-width: 400px;
+}
+
+.hexagram {
+    margin-top: 20px;
+    margin-left: auto;
+    margin-right: auto;
+    /* max-height: 80vh; */
+    max-width: 85vh;
+    /* height: 75vh; */
+    /* width: 60%; */
+}
+
+.row {
+    text-align: center;
+    /* height: 3%; */
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.space {
+    background: #f1d5b9; /* wood2 */
+
+    align-items: center;
+    display: inline-block;
+    margin-left: 4.5px;
+    margin-right: 4.5px;
+    box-shadow: inset 0px 0px 0px 0px;
+
+    /* keep width and padding the same */
+    height: auto;
+    width: 5%;
+    padding-top: 5%;
+
+    /* circular */
+    -moz-border-radius: 50%;
+    -webkit-border-radius: 50%;
+    border-radius: 50%;
+}
+
+.owned {
+    cursor: pointer;
+}
+
+
+@keyframes blinker {  
+    50% { opacity: 0.3; }
+}
+
+@keyframes fadein {
+    from { opacity: 0; }
+    to { opacity: 1; } 
+}
+
+@keyframes fadeout {
+    from { opacity: 1; }
+    to {opacity: 0; }
+}
+
+.possible {
+    cursor: pointer;
+}
+
+.possible:hover, .possible:focus, .possible:active {
+    background-color: #343434;                                      
+}
+
+.fade-in {
+    animation-name: fadein;
+    animation-duration: 1.5s;
+    animation-timing-function: linear;
+    animation-iteration-count: 1;
+}
+
+#turn-marble {
+    position: absolute;
+    top: 2em;
+    right: 4em;
+
+    width: 30px;
+    height: 30px;
+
+    /* circular */
+    -moz-border-radius: 50%;
+    -webkit-border-radius: 50%;
+    border-radius: 50%;
+
+    display: inline-block;
+    /* margin-left: 4px; */
+    /* margin-right: 4px; */
+}
+
+input {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+
+}
