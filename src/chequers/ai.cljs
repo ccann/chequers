@@ -83,9 +83,9 @@
          values   []]
     (if children
       (let [value (- (negamax (first children) player (- color) (dec depth) (- β) (- α)))
-            new-α (max α v)]
+            new-α (max α value)]
         (if (< new-α β)
-          (recur (next children) new-α (conj vs value))
+          (recur (next children) new-α (conj values value))
           values))
       values)))
 
